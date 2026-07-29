@@ -1,0 +1,2218 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // Neon pooled connection string — used at runtime.
+  url       = env("DATABASE_URL")
+  // Neon unpooled connection string — used only by `prisma migrate`.
+  directUrl = env("DIRECT_URL")
+}
+
+model WaitlistEntry {
+  id           String  @id @default(cuid())
+  fullName     String
+  email        String  @unique
+  phone        String
+  organisation String?
+  role         String
+  goal         String?
+  consent      Boolean @default(false)
+
+  // Attribution / tracking
+  source      String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmTerm     String?
+  utmContent  String?
+  referrer    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+  @@index([createdAt])
+}
+
+/// A single expression of interest from the public website.
+///
+/// ONE table for all four forms rather than four tables. WHY: every downstream
+/// need — the admin list, the CSV export, the "total registrations" tile, the
+/// duplicate check — is cross-segment. Four tables would mean four queries and
+/// four chances for a segment to be silently omitted from a report. Segment
+/// -specific answers live in `details` (JSON string) so adding a question to the
+/// employer form never requires a migration that touches employee rows.
+///
+/// NOTHING in this table is KYC. No BVN, no NIN, no bank credentials, no
+/// document uploads. Those are collected later through a secure verification
+/// portal, never through a public marketing form and never over email.
+model Registration {
+  id String @id @default(cuid())
+
+  /// employee | employer | capital_partner | general
+  segment       String
+  /// Bridger | Bridge Partner | Bridge Capital Partner | Enquirer
+  communityName String
+  /// waitlist | employer_interest | capital_interest | enquiry
+  stage         String
+  /// Workflow status. See REGISTRATION_STATUSES in src/types.ts.
+  status        String @default("New")
+
+  // ---- Identity (the common core every form collects) ----
+  fullName     String
+  email        String
+  phone        String?
+  /// Company for employer/capital, employer name for an employee.
+  organisation String?
+  jobTitle     String?
+  location     String?
+
+  /// Segment-specific answers, JSON-encoded. Read via `parseDetails()`.
+  details String @default("{}")
+
+  // ---- Consent, captured as separate, timestamped facts ----
+  /// Privacy policy acknowledgement. Required on every form.
+  privacyAccepted    Boolean   @default(false)
+  privacyAcceptedAt  DateTime?
+  /// Marketing / product updates. A SEPARATE opt-in, never bundled.
+  marketingConsent   Boolean   @default(false)
+  marketingConsentAt DateTime?
+  /// Verbatim text the person agreed to, so consent is provable years later.
+  consentText        String?
+
+  // ---- Provenance ----
+  /// The page the form was submitted from, e.g. "/register/employer".
+  sourcePage  String?
+  formType    String?
+  source      String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmTerm     String?
+  utmContent  String?
+  referrer    String?
+  /// Salted one-way hash of the submitting IP. WHY hashed: enough to spot abuse
+  /// and satisfy an audit, not enough to be a location dataset about applicants.
+  ipHash      String?
+  userAgent   String?
+
+  // ---- Internal pipeline (admin dashboard only, never exposed publicly) ----
+  followUpStatus String    @default("Not started")
+  assignedTeam   String?
+  assignedTo     String?
+  pilotPriority  String    @default("Unset")
+  /// interest_registered → initial_qualification → ... → review_and_scale
+  pipelineStage  String    @default("Interest Registered")
+  internalNotes  String?
+  qualified      Boolean?
+  lastContactAt  DateTime?
+
+  // ---- Email + demo state ----
+  confirmationSentAt   DateTime?
+  notificationSentAt   DateTime?
+  emailDeliveryNote    String?
+  demoInvitationStatus String    @default("Not invited")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invitations DemoInvitation[]
+  events      RegistrationEvent[]
+
+  /// Deduplication key: same person, same segment = one row, refreshed.
+  /// A single unique on `email` alone would be wrong — one person can legitimately
+  /// register as an employee and later as an employer.
+  @@unique([segment, email])
+  @@index([segment])
+  @@index([status])
+  @@index([createdAt])
+  @@index([email])
+}
+
+/// One thing that happened to a registration. Append-only.
+///
+/// WHY this exists separately from the audit log: the audit log deliberately
+/// records field NAMES without values, because it is a security artefact that
+/// must not become a second, less-protected copy of personal data. It cannot
+/// answer the operational question — "this employer sat in Initial Qualification
+/// for five weeks, who moved it and why?" That question needs the old and new
+/// value, and it needs to be readable by the person working the pipeline.
+///
+/// WHY append-only: `status`, `pipelineStage` and `internalNotes` on Registration
+/// are all last-write-wins. Before this table, moving a lead backwards, or
+/// pasting over someone else's note, left no trace at all. Rows here are never
+/// updated or deleted — a correction is a NEW event, so the mistake and the fix
+/// are both visible.
+///
+/// This is internal-pipeline data. It is never exposed by any public route and
+/// is not included in the registrant-facing CSV export.
+model RegistrationEvent {
+  id String @id @default(cuid())
+
+  registrationId String
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  /// See REGISTRATION_EVENT_KINDS in src/types.ts.
+  /// e.g. registered | resubmitted | field_changed | note | contacted |
+  ///      email_sent | invitation_issued | invitation_revoked | demo_accessed
+  kind String
+
+  /// Which field moved, for kind = field_changed. Null otherwise.
+  field    String?
+  /// Previous and new values, as display strings. Pipeline vocabulary only
+  /// ("New" → "Contacted"), never identity or contact details.
+  oldValue String?
+  newValue String?
+
+  /// Free text: the note body, or a one-line summary of a system event.
+  message String?
+
+  /// Admin username for a human action, or "system" for an automatic one.
+  /// Stored in the clear on purpose: accountability is the point of the row.
+  actor String @default("system")
+
+  createdAt DateTime @default(now())
+
+  /// Reads are always "the timeline for one registration, newest first".
+  @@index([registrationId, createdAt])
+}
+
+/// A private-demonstration invitation. Single-use, expiring, attributable.
+///
+/// The token is stored HASHED. WHY: the invitation link is the credential. A
+/// database dump (or a support engineer with read access) must not hand anyone
+/// a working demo login. We store sha256(token) and compare hashes, exactly as
+/// you would with a password.
+model DemoInvitation {
+  id        String @id @default(cuid())
+  /// sha256 of the normalised code (PB-7K4M-92QX, upper-case, hyphens stripped).
+  /// The raw code exists only in the invitation message and, once, on screen.
+  tokenHash String @unique
+  /// Non-secret opening group so the admin UI can identify a code it cannot
+  /// read — "PB-7K4M-••••". Enough to match against what an invitee quotes.
+  tokenHint String
+
+  /// The invited address. Entering the code from a DIFFERENT address is refused:
+  /// the code alone is not the credential, the pair is. That is what stops a
+  /// forwarded invitation from working for the person it was forwarded to.
+  email        String
+  /// Invitee's name, for the message and the admin list.
+  inviteeName  String?
+  /// Invitee's organisation. Free text — prospects are not in our customer table.
+  organisation String?
+  label        String?
+  /// employee | employer | investor | operations — which portal the code opens.
+  /// Derived from demoType; kept because the demo session is scoped by portal.
+  portal       String  @default("employer")
+  /// See DEMO_TYPES in src/types.ts: employee_experience | employer_dashboard |
+  /// capital_provider | partner | full_platform.
+  demoType     String  @default("full_platform")
+  /// Why this person was invited. Staff-only, never sent to the invitee.
+  internalNote String?
+
+  issuedBy        String
+  /// The AdminUser who issued it, when the issuer is a database admin account.
+  /// Nullable because early invitations predate the admin user table.
+  issuedByAdminId String?
+  issuedByAdmin   AdminUser?    @relation("IssuedInvitations", fields: [issuedByAdminId], references: [id], onDelete: SetNull)
+  registrationId  String?
+  registration    Registration? @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+
+  expiresAt  DateTime
+  /// First time the code was accepted. Null until then.
+  redeemedAt DateTime?
+  revokedAt  DateTime?
+  revokedBy  String?
+  /// How many sessions this code may open. Default 1 (single use).
+  maxUses    Int       @default(1)
+  useCount   Int       @default(0)
+
+  /// Delivery bookkeeping, so "did they even get it?" is answerable and a
+  /// resend is a recorded act rather than a guess.
+  lastSentAt DateTime?
+  sendCount  Int       @default(0)
+  /// Set the first time the invitee loads the demo-access page with this code
+  /// pre-filled, or the first failed attempt that matched this code. Lets the
+  /// admin list distinguish "never touched it" from "tried and failed".
+  openedAt   DateTime?
+  /// Set whenever an admin pushes the expiry out, so extensions are visible.
+  extendedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accesses DemoAccessLog[]
+
+  @@index([email])
+  @@index([expiresAt])
+  @@index([createdAt])
+}
+
+/// Who opened the private demo, when, and how. Required by section 9
+/// ("Record who accessed it and when") and by any post-hoc question about
+/// where a screenshot came from.
+model DemoAccessLog {
+  id           String          @id @default(cuid())
+  invitationId String?
+  invitation   DemoInvitation? @relation(fields: [invitationId], references: [id], onDelete: SetNull)
+
+  email     String?
+  /// invitation | access_code | denied
+  method    String
+  outcome   String
+  path      String?
+  ipHash    String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([invitationId])
+}
+
+// ==========================================================================
+// CUSTOMER ACCOUNTS
+// ==========================================================================
+
+/// A real customer account. Distinct from Registration: a Registration is an
+/// expression of interest from a marketing form and carries no credential; a
+/// User can sign in.
+///
+/// WHY the two are separate tables rather than one with a nullable password:
+/// the registration forms are public and unauthenticated, so anything reachable
+/// from them is reachable by anyone. Keeping credentials, verification state and
+/// KYC in a different table means a bug in the public form cannot touch an
+/// authenticated account, and the marketing CSV export cannot accidentally
+/// include a password hash.
+model User {
+  id String @id @default(cuid())
+
+  email    String  @unique
+  phone    String?
+  fullName String
+
+  /// argon2id, via the `argon2` package. Never a raw password, never a reversible hash.
+  passwordHash String
+
+  /// Which product the customer signed up for. Governs which dashboard they
+  /// land on. NOT a permission — permissions come from the server role map.
+  /// employee | employer | investor
+  accountType String @default("employee")
+
+  // ---- Contact verification. Both channels tracked; email is mandatory. ----
+  emailVerifiedAt DateTime?
+  phoneVerifiedAt DateTime?
+
+  // ---- Account lifecycle ----
+  // active    — normal
+  // suspended — blocked by PayBridge; sign-in refused with a support message
+  // closed    — self-closed or offboarded
+  //
+  status          String    @default("active")
+  suspendedAt     DateTime?
+  suspendedBy     String?
+  /// Shown to the user. Written by staff, so it must be safe to display.
+  suspendedReason String?
+
+  // ---- KYC state machine ----
+  // not_started → pending → approved
+  // ↘ rejected → (resubmit) → pending
+  //
+  // This single field is the gate on every regulated feature. It lives on the
+  // user row rather than being derived from documents so the check is one
+  // comparison, in one place, that cannot drift from the documents table.
+  //
+  kycStatus          String    @default("not_started")
+  kycSubmittedAt     DateTime?
+  kycReviewedAt      DateTime?
+  kycReviewedBy      String?
+  /// Reason shown to the customer on rejection. Staff choose from a vocabulary
+  /// plus optional free text; both are safe to display by construction.
+  kycRejectionReason String?
+  /// Reviewer-only detail that must NOT be shown to the customer (e.g. an
+  /// adverse-media hit). Kept apart so "show the reason" can never leak it.
+  kycInternalNote    String?
+
+  // ---- Credential hygiene ----
+  passwordChangedAt DateTime @default(now())
+  /// Bumped on password change and on suspension. Sessions carry the epoch they
+  /// were minted with; a mismatch is rejected. WHY: cookie sessions are
+  /// self-contained, so without a server-side generation counter a stolen
+  /// session survives a password reset — the one moment the user is certain
+  /// they want everything else logged out.
+  sessionEpoch      Int      @default(1)
+
+  // ---- Online-guessing defence (server-side; the client copy is advisory) --
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+  lastLoginAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  verificationCodes VerificationCode[]
+  kycProfile        KycProfile?
+  kycDocuments      KycDocument[]
+  /// How PayBridge should behave for this person. See UserPreference — employers
+  /// never read it.
+  preferences       UserPreference?
+  supportTickets    SupportTicket[]
+  consents          UserConsent[]
+
+  @@index([status])
+  @@index([kycStatus])
+  @@index([createdAt])
+}
+
+/// A one-time code sent to an email address or phone number.
+///
+/// Stored HASHED, exactly like a password, and for the same reason: a six-digit
+/// code that grants account access is a credential. A database reader must not
+/// be able to complete someone else's verification.
+model VerificationCode {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// email | phone
+  channel     String
+  /// The address/number the code was actually sent to, so changing the address
+  /// mid-flow cannot be used to verify the old one.
+  destination String
+
+  /// sha256 of the code. See src/security/codes.ts.
+  codeHash   String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  /// Wrong guesses against THIS code. The code dies at 5 regardless of expiry.
+  attempts   Int       @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, channel])
+  @@index([expiresAt])
+}
+
+/// Identity information supporting a KYC submission.
+///
+/// EVERY identifying field here is stored ENCRYPTED (AES-256-GCM, key from the
+/// environment — see src/security/field-crypto.ts). WHY, when the database is
+/// already access-controlled: a BVN, a NIN and a date of birth are directly
+/// usable for identity theft and are exactly what a dump is stolen for.
+/// Encrypting at the field level means a leaked database file, a backup copy or
+/// an over-broad read grant yields ciphertext, and the key lives somewhere else
+/// entirely.
+///
+/// The trade-off is accepted deliberately: these fields cannot be searched or
+/// indexed. Nothing in the product needs to search by BVN, and a KYC reviewer
+/// opens one case at a time.
+model KycProfile {
+  id String @id @default(cuid())
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Non-sensitive, kept in the clear so the reviewer list can filter by them.
+  country String  @default("NG")
+  state   String?
+  city    String?
+  /// nin | bvn | passport | drivers_licence | voters_card
+  idType  String
+
+  // -- Encrypted payloads. Format: v1.<iv-b64>.<tag-b64>.<ciphertext-b64> --
+  idNumberEnc    String
+  dateOfBirthEnc String
+  addressEnc     String
+  /// Optional secondary identifier (BVN alongside a NIN, say).
+  bvnEnc         String?
+  /// Last four characters of the id number, in the clear, so a reviewer can
+  /// match a document to a record without decrypting anything.
+  idNumberLast4  String?
+
+  /// Employer or business name — commercially sensitive but not an identity
+  /// document, so kept readable for the reviewer queue.
+  employerName String?
+  occupation   String?
+
+  submittedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([country])
+}
+
+/// A single uploaded KYC document.
+///
+/// The bytes are NOT stored in this table. `storageKey` points at object
+/// storage; the row carries only metadata plus a content hash. WHY: document
+/// images are the highest-value data in the system, they are large, and a
+/// database row is the easiest thing in an estate to over-share. Keeping the
+/// bytes behind a separate, short-lived signed URL means a database compromise
+/// does not hand over the passports.
+model KycDocument {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// id_front | id_back | selfie | proof_of_address | employment_letter
+  docType     String
+  /// Original filename, sanitised. Display only — never used as a path.
+  fileName    String
+  mimeType    String
+  sizeBytes   Int
+  /// sha256 of the bytes. Detects a swapped file and de-duplicates re-uploads.
+  contentHash String
+  /// Opaque key in object storage. Never a client-supplied path.
+  storageKey  String
+
+  /// pending | accepted | rejected
+  status          String  @default("pending")
+  rejectionReason String?
+
+  uploadedAt DateTime @default(now())
+
+  @@index([userId, docType])
+}
+
+// ==========================================================================
+// ADMINISTRATORS
+// ==========================================================================
+
+/// A PayBridge staff account for the admin portal.
+///
+/// WHY a table rather than the environment variables this replaces: env-based
+/// credentials cannot be rotated per person, cannot carry a role, cannot be
+/// revoked without a redeploy, and give every administrator the same identity in
+/// the audit log — which defeats the purpose of an audit log. The env path
+/// remains only as a documented break-glass fallback.
+///
+/// NO password is ever written into source. The first account is created by a
+/// deployment seed that generates a one-time password and prints it once.
+model AdminUser {
+  id String @id @default(cuid())
+
+  name  String
+  email String @unique
+
+  /// argon2id via the `argon2` package.
+  passwordHash String
+
+  /// super_admin | kyc_reviewer | operations_admin | demo_manager | auditor
+  /// Authoritative copy. The frontend role map only hides dead ends.
+  role String
+
+  /// active | suspended
+  status String @default("active")
+
+  // ---- First-run obligations. The portal refuses to do anything else until
+  // all four are satisfied; see requireOnboardedAdmin(). ----
+  mustChangePassword      Boolean   @default(true)
+  /// A seeded password is a bearer token sitting in someone's terminal history.
+  /// It dies at this instant or on first successful use, whichever comes first.
+  tempPasswordExpiresAt   DateTime?
+  passwordChangedAt       DateTime?
+  /// Encrypted TOTP secret. Encrypted, not hashed: verification needs the
+  /// original value, so this is the one credential we must be able to read back.
+  mfaSecretEnc            String?
+  /// Set once TOTP has been proven with a live code — never at enrolment.
+  mfaEnabledAt            DateTime?
+  /// sha256 of each single-use recovery code, JSON array. Consumed on use.
+  mfaBackupCodes          String?
+  recoveryEmail           String?
+  recoveryEmailVerifiedAt DateTime?
+  policyAcceptedAt        DateTime?
+  policyVersion           String?
+
+  /// Same mechanism as User.sessionEpoch: bumped on password change, role
+  /// change and suspension, which is what makes "sign every other session out"
+  /// actually true.
+  sessionEpoch Int @default(1)
+
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+  lastLoginAt      DateTime?
+  lastLoginIp      String?
+
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  issuedInvitations DemoInvitation[] @relation("IssuedInvitations")
+
+  @@index([role])
+  @@index([status])
+}
+
+// ==========================================================================
+// AUDIT
+// ==========================================================================
+
+/// Durable audit trail.
+///
+/// WHY this exists when src/security/audit.ts already logs to stdout: stdout is
+/// a stream, not a record. It rotates, it is not queryable from the portal, and
+/// in most hosting it is retained for days. "Who approved this KYC case in
+/// March" has to be answerable from the database.
+///
+/// Rows are APPEND-ONLY. There is no update or delete path in the application;
+/// a correction is a new row. An audit table an administrator can edit is not
+/// evidence.
+///
+/// ON IP ADDRESSES: this table stores the caller's IP in the clear, unlike
+/// DemoAccessLog which hashes it. That is a deliberate, narrower exception —
+/// an IP is personal data, but for privileged actions (admin sign-in, KYC
+/// decisions, role changes) an unresolvable hash cannot support an
+/// investigation or meet a regulator's expectations. Scope is the control:
+/// only security-relevant events land here, and rows are pruned on the
+/// retention schedule in README section 6.
+model AuditEvent {
+  id String @id @default(cuid())
+
+  /// admin | user | invitee | system | anonymous
+  actorType  String
+  /// AdminUser.id / User.id where one exists.
+  actorId    String?
+  /// Human-readable actor for the log view (admin email, "system", …).
+  actorLabel String?
+
+  /// Dotted action name, e.g. admin.login, kyc.approved, invitation.revoked.
+  action  String
+  /// success | failure | denied
+  outcome String
+
+  /// What was acted upon: user | admin | invitation | kyc | registration | …
+  targetType String?
+  targetId   String?
+
+  /// State transitions, where the action is a transition.
+  previousStatus String?
+  newStatus      String?
+
+  ip        String?
+  userAgent String?
+  /// Correlates with the access log for the same request.
+  requestId String?
+  /// Extra context as JSON. MUST NOT contain credentials, document bytes,
+  /// decrypted KYC fields or invitation codes — enforced in audit-store.ts.
+  detail    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action, createdAt])
+  @@index([actorId, createdAt])
+  @@index([targetType, targetId])
+}
+
+// ===========================================================================
+// EMPLOYER INTELLIGENCE RAIL (EIR)
+// ===========================================================================
+//
+// Continuous employer underwriting, monitoring and intelligence — not a loan
+// application form. The organising idea is that an employer profile is LIVING:
+// every payroll cycle, repayment, document and material event updates it, and
+// every score carries the policy version and inputs that produced it so an old
+// decision can still be explained years later.
+//
+// FOUR SEPARATE CONCERNS, kept separate in the tables as well as the code:
+//   1. Data        — Employer, Document, BankTransaction, PayrollCycle, …
+//   2. Risk rules  — ScoringPolicyVersion, EmployerScore, ScoreComponent,
+//                    KnockoutEvaluation, LimitRecommendation
+//   3. AI          — AiAssessment (advisory only, never a decision)
+//   4. Decisions   — CreditDecision, ApprovalVote, CreditLimit
+// An AI row can never BE a decision: CreditDecision has no nullable-actor path,
+// so a decision without a human administrator id cannot be written.
+//
+// MONEY: genuinely monetary fields are Decimal(18,2) on PostgreSQL — see
+// docs/eir-database.md. Ratios, percentages and scores (weights, availability
+// percentages, paid fractions, ownership percentages) stay Float: nothing in
+// the scoring engine compares them for equality, so float representation is
+// safe for the thresholds actually computed against those.
+//
+// SENSITIVE FIELDS: anything suffixed `Enc` is AES-256-GCM via
+// security/field-crypto.ts (BVN, NIN, identity numbers, bank account numbers,
+// employee names). The `…Last4`/`…Masked` companions exist so a reviewer can
+// match a document to a record without decrypting anything.
+//
+// SOFT DELETION: `deletedAt` on the entities a person can remove. Underwriting
+// evidence is never hard-deleted — a retention job (docs/eir-security.md) is the
+// only thing permitted to purge, and it records what it purged.
+
+/// An employer under assessment. The living profile the whole rail maintains.
+model Employer {
+  id String @id @default(cuid())
+
+  // ---- Stage 1: corporate profile ----
+  registeredName     String
+  tradingName        String?
+  /// Corporate Affairs Commission registration number (Nigeria).
+  cacNumber          String?   @unique
+  incorporationDate  DateTime?
+  /// private_limited | public_limited | business_name | incorporated_trustees |
+  /// partnership | government_agency | cooperative
+  companyType        String?
+  /// Tax Identification Number.
+  tin                String?
+  registeredAddress  String?
+  operationalAddress String?
+  website            String?
+  /// Key into INDUSTRIES (risk/industry.ts). Drives the sector template.
+  industry           String?
+  subIndustry        String?
+  employeeCount      Int?
+  /// Self-declared at onboarding. Verified figures live on PayrollCycle.
+  monthlyPayroll     Decimal? @db.Decimal(18, 2)
+  monthlyRevenue     Decimal? @db.Decimal(18, 2)
+  /// JSON array of state names.
+  statesOfOperation  String?
+
+  // ---- Lifecycle ----
+  /// onboarding | submitted | under_review | approved | conditionally_approved
+  /// | declined | active | restricted | suspended | closed
+  status            String    @default("onboarding")
+  /// Set when monitoring or compliance restricts the employer. Human-readable:
+  /// it is shown to the employer, so it must be safe to display.
+  restrictionReason String?
+  watchlistedAt     DateTime?
+  watchlistReason   String?
+
+  /// Denormalised copy of the latest score, for list views and filters only.
+  /// Authoritative history is EmployerScore — never read this for a decision.
+  currentScore      Int?
+  currentTier       String?
+  earlyWarningLevel String    @default("green")
+  nextReviewDate    DateTime?
+
+  /// Owning relationship manager (AdminUser.id).
+  relationshipManagerId String?
+
+  createdBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  contacts             EmployerContact[]
+  employerUsers        EmployerUser[]
+  directors            Director[]
+  beneficialOwners     BeneficialOwner[]
+  applications         Application[]
+  documents            EmployerDocument[]
+  consents             Consent[]
+  bankAccounts         BankAccount[]
+  financialPeriods     FinancialPeriod[]
+  payrollCycles        PayrollCycle[]
+  employees            EmployeeRecord[]
+  scores               EmployerScore[]
+  aiAssessments        AiAssessment[]
+  analystReviews       AnalystReview[]
+  complianceChecks     ComplianceCheck[]
+  bureauChecks         BureauCheck[]
+  alerts               Alert[]
+  decisions            CreditDecision[]
+  limits               CreditLimit[]
+  utilisations         Utilisation[]
+  repayments           Repayment[]
+  covenants            Covenant[]
+  monitoringReviews    MonitoringReview[]
+  externalIntelligence ExternalIntelligence[]
+
+  @@index([status])
+  @@index([currentTier])
+  @@index([industry])
+  @@index([earlyWarningLevel])
+  @@index([relationshipManagerId])
+  @@index([nextReviewDate])
+}
+
+/// Named humans at the employer, by function. Not login accounts.
+model EmployerContact {
+  id         String   @id @default(cuid())
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  /// primary | finance | hr | signatory
+  contactType      String
+  fullName         String
+  jobTitle         String?
+  email            String?
+  phone            String?
+  /// For signatories: what they are authorised to sign.
+  signingAuthority String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([employerId, contactType])
+}
+
+/// A login account belonging to an employer, scoped to that employer only.
+model EmployerUser {
+  id         String   @id @default(cuid())
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  email        String  @unique
+  fullName     String
+  /// argon2id via the `argon2` package. Null until an invited representative sets one.
+  passwordHash String?
+
+  /// employer_admin | employer_contributor | employer_viewer
+  role   String @default("employer_admin")
+  /// invited | active | suspended
+  status String @default("invited")
+
+  invitedBy        String?
+  invitedAt        DateTime  @default(now())
+  acceptedAt       DateTime?
+  lastLoginAt      DateTime?
+  /// Same generation-counter mechanism as User.sessionEpoch.
+  sessionEpoch     Int       @default(1)
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([employerId, status])
+}
+
+/// A director. Identity numbers encrypted; only the last four are readable.
+model Director {
+  id         String   @id @default(cuid())
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  fullName            String
+  role                String?
+  appointedAt         DateTime?
+  nationality         String?
+  residentialAddress  String?
+  dateOfBirthEnc      String?
+  /// bvn | nin | passport | drivers_licence | voters_card
+  idType              String?
+  idNumberEnc         String?
+  idNumberLast4       String?
+  bvnEnc              String?
+  bvnLast4            String?
+  /// Politically Exposed Person. Declared at onboarding, then screened.
+  pepDeclared         Boolean   @default(false)
+  pepScreenedAt       DateTime?
+  /// clear | possible_match | confirmed_match | not_screened
+  pepResult           String    @default("not_screened")
+  sanctionsScreenedAt DateTime?
+  sanctionsResult     String    @default("not_screened")
+  /// JSON array of other companies and directorships declared.
+  otherDirectorships  String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([employerId])
+}
+
+/// Ultimate beneficial owner. Separate from Director on purpose: the person who
+/// controls the company is frequently not on the board, and conflating the two
+/// is how a UBO check quietly ends up screening the wrong people.
+model BeneficialOwner {
+  id         String   @id @default(cuid())
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  fullName            String
+  /// Percentage held, 0–100.
+  ownershipPercent    Float?
+  /// direct | indirect | via_trust | via_corporate
+  ownershipType       String?
+  nationality         String?
+  residentialAddress  String?
+  idType              String?
+  idNumberEnc         String?
+  idNumberLast4       String?
+  bvnEnc              String?
+  bvnLast4            String?
+  pepDeclared         Boolean   @default(false)
+  pepScreenedAt       DateTime?
+  pepResult           String    @default("not_screened")
+  sanctionsScreenedAt DateTime?
+  sanctionsResult     String    @default("not_screened")
+  /// JSON array of related companies.
+  relatedCompanies    String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([employerId])
+}
+
+/// One underwriting case. An employer has many over time — a renewal, a limit
+/// increase and a new product are each their own case with their own decision.
+model Application {
+  id         String   @id @default(cuid())
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  /// Human reference shown in the UI, e.g. EIR-2026-0007.
+  reference String @unique
+
+  /// Workflow stage. Ordered list in risk/workflow.ts — the state machine there
+  /// is authoritative; this column is the current position in it.
+  /// draft | submitted | completeness_review | identity_verification |
+  /// compliance_review | financial_analysis | payroll_analysis |
+  /// ai_assessment | scoring | proposed_terms | analyst_recommendation |
+  /// approval | offer_issued | documentation | activation | monitoring |
+  /// declined | withdrawn | deferred
+  stage String @default("draft")
+
+  requestedLimit       Decimal?  @db.Decimal(18, 2)
+  desiredLaunchDate    DateTime?
+  expectedParticipants Int?
+  currentPayrollDate   String?
+  /// monthly | semi_monthly | biweekly | weekly
+  payrollFrequency     String?
+  reasonForRequest     String?
+  payrollChallenges    String?
+  /// Declared existing lenders / EWA providers. Undisclosed borrowing found
+  /// later is a knockout rule, which is why the declaration is stored.
+  existingProviders    String?
+
+  submittedAt     DateTime?
+  submittedBy     String?
+  completedStages String?
+
+  createdBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  productRequests ProductRequest[]
+  documents       EmployerDocument[]
+  scores          EmployerScore[]
+  aiAssessments   AiAssessment[]
+  analystReviews  AnalystReview[]
+  decisions       CreditDecision[]
+  limits          CreditLimit[]
+  consents        Consent[]
+
+  @@index([employerId, stage])
+  @@index([stage])
+  @@index([submittedAt])
+}
+
+/// One product the employer asked for. Separate rows because the limit engine
+/// prices and caps each product independently.
+model ProductRequest {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  /// ewa | payroll_buffer | payroll_financing | savings_investments |
+  /// wellness_programme
+  product         String
+  requestedAmount Decimal? @db.Decimal(18, 2)
+  notes           String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([applicationId, product])
+}
+
+/// A document in its lifecycle. The lifecycle IS the value: "uploaded" and
+/// "verified" are different facts and only the second one may feed a decision.
+model EmployerDocument {
+  id            String       @id @default(cuid())
+  employerId    String
+  employer      Employer     @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  /// Key into DOCUMENT_TYPES (eir/documents.ts).
+  docType     String
+  /// required | optional
+  requirement String @default("required")
+  /// requested | uploaded | verified | rejected | expired | replacement_requested
+  status      String @default("requested")
+
+  fileName    String?
+  mimeType    String?
+  sizeBytes   Int?
+  /// sha256 of the bytes — detects a swapped file and de-duplicates re-uploads.
+  contentHash String?
+  /// Opaque storage key. Never a client-supplied path.
+  storageKey  String?
+
+  /// For documents that go stale (tax clearance, licences, statements).
+  validFrom DateTime?
+  expiresAt DateTime?
+
+  uploadedBy        String?
+  uploadedAt        DateTime?
+  requestedBy       String?
+  requestedAt       DateTime  @default(now())
+  /// Why a replacement was asked for — shown to the employer.
+  replacementReason String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  verifications DocumentVerification[]
+
+  @@index([employerId, docType])
+  @@index([employerId, status])
+  @@index([expiresAt])
+}
+
+/// A verification attempt against a document. Append-only: a re-verification
+/// adds a row rather than editing one, so "who cleared this and when" survives.
+model DocumentVerification {
+  id         String           @id @default(cuid())
+  documentId String
+  document   EmployerDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  /// verified | rejected | inconclusive
+  outcome       String
+  /// manual | provider_api | ai_assisted
+  method        String  @default("manual")
+  /// Which provider, where AI or an API was involved. AI-assisted checks are
+  /// advisory: `outcome` still requires a human reviewerId.
+  provider      String?
+  reviewerId    String?
+  reviewerLabel String?
+  notes         String?
+  /// JSON: field-by-field comparison against the corporate profile.
+  fieldFindings String?
+
+  createdAt DateTime @default(now())
+
+  @@index([documentId, createdAt])
+}
+
+/// A consent, captured with everything needed to prove it later.
+model Consent {
+  id            String       @id @default(cuid())
+  employerId    String
+  employer      Employer     @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  /// accuracy_declaration | verification | credit_check | ongoing_monitoring |
+  /// data_processing | employee_data_lawful | privacy_terms
+  consentType    String
+  /// The exact wording version accepted. Never overwritten — a later revision
+  /// creates a new version, and old consents keep pointing at what was shown.
+  wordingVersion String
+  /// sha256 of the exact text displayed, so the wording can be proven.
+  wordingHash    String
+  granted        Boolean @default(true)
+
+  acceptedByName   String?
+  acceptedByEmail  String?
+  acceptedByUserId String?
+  ip               String?
+  userAgent        String?
+  acceptedAt       DateTime  @default(now())
+  withdrawnAt      DateTime?
+
+  @@index([employerId, consentType])
+}
+
+/// An employer bank account. Account number encrypted; last four readable.
+model BankAccount {
+  id         String   @id @default(cuid())
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  bankName           String
+  accountName        String?
+  accountNumberEnc   String?
+  accountNumberLast4 String?
+  /// current | savings | domiciliary | collections | payroll
+  accountType        String    @default("current")
+  currency           String    @default("NGN")
+  /// True for the account salaries are actually paid from — the one that
+  /// matters for salary coverage and payroll-vs-bank consistency.
+  isPayrollAccount   Boolean   @default(false)
+  /// csv_upload | xlsx_upload | provider_api
+  source             String    @default("csv_upload")
+  statementFrom      DateTime?
+  statementTo        DateTime?
+  /// Never store online-banking credentials. Provider tokens live in the
+  /// secret store keyed by this id; nothing readable is kept on the row.
+  providerRef        String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  transactions BankTransaction[]
+
+  @@index([employerId])
+}
+
+/// A normalised bank-statement line. Deterministically classified — no AI.
+model BankTransaction {
+  id            String      @id @default(cuid())
+  bankAccountId String
+  bankAccount   BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+
+  valueDate    DateTime
+  narration    String
+  /// credit | debit
+  direction    String
+  amount       Decimal  @db.Decimal(18, 2)
+  balanceAfter Decimal? @db.Decimal(18, 2)
+
+  /// Rule-based classification (eir/classify.ts): salary | loan_repayment |
+  /// tax | pension | returned_payment | revenue | supplier | charge | other
+  category   String  @default("other")
+  /// True when the narration matches a returned/reversed-payment pattern.
+  isReturned Boolean @default(false)
+  /// sha256(account+date+amount+narration) — makes re-upload idempotent.
+  dedupeHash String
+
+  createdAt DateTime @default(now())
+
+  @@unique([bankAccountId, dedupeHash])
+  @@index([bankAccountId, valueDate])
+  @@index([bankAccountId, category])
+}
+
+/// A calendar month of employer financials, normalised from any source.
+model FinancialPeriod {
+  id         String   @id @default(cuid())
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  /// First day of the month, UTC. One row per employer per month.
+  periodStart DateTime
+  periodEnd   DateTime
+  /// bank_statement | management_accounts | audited_accounts | self_declared
+  source      String
+
+  inflows           Decimal? @db.Decimal(18, 2)
+  outflows          Decimal? @db.Decimal(18, 2)
+  openingBalance    Decimal? @db.Decimal(18, 2)
+  closingBalance    Decimal? @db.Decimal(18, 2)
+  lowestBalance     Decimal? @db.Decimal(18, 2)
+  revenue           Decimal? @db.Decimal(18, 2)
+  costOfSales       Decimal? @db.Decimal(18, 2)
+  operatingExpenses Decimal? @db.Decimal(18, 2)
+  operatingProfit   Decimal? @db.Decimal(18, 2)
+  payrollCost       Decimal? @db.Decimal(18, 2)
+  debtService       Decimal? @db.Decimal(18, 2)
+  taxRemitted       Decimal? @db.Decimal(18, 2)
+  pensionRemitted   Decimal? @db.Decimal(18, 2)
+  returnedPayments  Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([employerId, periodStart, source])
+  @@index([employerId, periodStart])
+}
+
+/// One computed metric, with everything needed to explain it.
+///
+/// WHY the formula and benchmark are stored per row rather than looked up: a
+/// metric explained by today's policy is not an explanation of a decision made
+/// under last year's. These rows are the audit trail of the arithmetic.
+model FinancialMetric {
+  id      String        @id @default(cuid())
+  scoreId String
+  score   EmployerScore @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+
+  /// Key into FINANCIAL_METRICS (risk/financial.ts).
+  metric         String
+  label          String
+  value          Float?
+  /// Formatted for display, e.g. "38.4%", "2.1x", "₦4.2m".
+  displayValue   String?
+  /// The arithmetic, in words, exactly as applied.
+  formula        String
+  /// The policy threshold in force when this was calculated.
+  benchmark      String?
+  /// strong | acceptable | watch | weak | critical | insufficient_data
+  classification String
+  /// Which rows fed it — table and period range.
+  dataSource     String?
+  /// JSON array of {period, value} for the trend chart.
+  trend          String?
+
+  createdAt DateTime @default(now())
+
+  @@index([scoreId, metric])
+}
+
+/// One payroll cycle, and whether the employer actually paid on time.
+model PayrollCycle {
+  id         String   @id @default(cuid())
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  /// The month this cycle belongs to (first day, UTC).
+  periodStart     DateTime
+  /// What the employer says the pay date is.
+  expectedPayDate DateTime
+  /// When salaries actually landed, from payroll file or bank evidence.
+  actualPayDate   DateTime?
+
+  totalAmount       Decimal?  @db.Decimal(18, 2)
+  employeeCount     Int?
+  /// early | on_time | slightly_delayed | materially_delayed | missed |
+  /// partially_paid  — derived deterministically in risk/payroll.ts.
+  timeliness        String    @default("unknown")
+  delayDays         Int?
+  /// Fraction actually paid, 0–1. Below 1 means a partial cycle.
+  paidFraction      Float?
+  corrections       Int       @default(0)
+  reversals         Int       @default(0)
+  pensionRemittedAt DateTime?
+  taxRemittedAt     DateTime?
+
+  /// payroll_upload | bank_derived | provider_api
+  source               String  @default("payroll_upload")
+  /// True where a payroll file claims a payment the bank statement does not
+  /// show. Feeds the payroll-vs-bank-evidence knockout rule.
+  bankEvidenceMismatch Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  records PayrollRecord[]
+
+  @@unique([employerId, periodStart])
+  @@index([employerId, expectedPayDate])
+}
+
+/// One employee's line in one payroll cycle.
+///
+/// EMPLOYEE PRIVACY: the name and account number are encrypted, and the whole
+/// table is aggregate-only to every internal role — nothing in the API exposes
+/// a single employee's row to an underwriter, because underwriting needs the
+/// distribution, not the individual.
+model PayrollRecord {
+  id         String          @id @default(cuid())
+  cycleId    String
+  cycle      PayrollCycle    @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  employeeId String?
+  employee   EmployeeRecord? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  /// Employer's own staff reference. Not a national identifier.
+  staffRef         String?
+  fullNameEnc      String?
+  grossPay         Decimal  @db.Decimal(18, 2)
+  netPay           Decimal? @db.Decimal(18, 2)
+  deductions       Decimal? @db.Decimal(18, 2)
+  allowances       Decimal? @db.Decimal(18, 2)
+  bonus            Decimal? @db.Decimal(18, 2)
+  accountNumberEnc String?
+  paidAt           DateTime?
+  /// paid | pending | failed | reversed | partial
+  paymentStatus    String    @default("paid")
+
+  createdAt DateTime @default(now())
+
+  @@index([cycleId])
+  @@index([employeeId])
+}
+
+/// An employee of the employer, for headcount and tenure analysis only.
+model EmployeeRecord {
+  id         String   @id @default(cuid())
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  staffRef     String
+  fullNameEnc  String?
+  /// Pseudonymous, stable key used for de-duplication across uploads without
+  /// holding a plaintext identifier.
+  identityHash String?
+  department   String?
+  jobTitle     String?
+  hiredAt      DateTime?
+  exitedAt     DateTime?
+  /// active | exited | suspended
+  status       String    @default("active")
+  /// Whether this employee is enrolled in the EWA programme. Enrolment is not
+  /// usage: per-employee usage is deliberately not modelled here.
+  ewaEnrolled  Boolean   @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  payrollRecords PayrollRecord[]
+
+  @@unique([employerId, staffRef])
+  @@index([employerId, status])
+}
+
+/// A versioned scoring policy. Weights, benchmarks and knockout rules together.
+///
+/// Immutable once published: a change creates a new version. Historical
+/// decisions keep pointing at the version they were made under, which is the
+/// only way "why was this approved?" stays answerable after a policy change.
+model ScoringPolicyVersion {
+  id      String @id @default(cuid())
+  /// Monotonic label, e.g. "v3".
+  version String @unique
+  name    String
+  /// draft | published | superseded
+  status  String @default("draft")
+
+  /// Component weights, percent, summing to exactly 100. JSON.
+  weights           String
+  /// Tier boundaries. JSON: [{tier, min, max}].
+  tiers             String
+  /// Metric benchmarks. JSON keyed by metric.
+  benchmarks        String
+  /// Knockout rules. JSON: [{key, label, severity, overridable, …}].
+  knockoutRules     String
+  /// Limit-engine parameters per tier and product. JSON.
+  limitRules        String
+  /// Approval-authority thresholds. JSON: [{role, maxExposure, dualApproval}].
+  authorityMatrix   String
+  /// Per-industry weight adjustments and extra questions. JSON.
+  industryOverrides String?
+
+  /// Mandatory. A weight change with no stated reason is unauditable.
+  changeReason   String
+  createdBy      String
+  createdByLabel String?
+  publishedAt    DateTime?
+  supersededAt   DateTime?
+  createdAt      DateTime  @default(now())
+
+  scores    EmployerScore[]
+  decisions CreditDecision[]
+
+  @@index([status])
+}
+
+/// One complete scoring run — a snapshot, never updated in place.
+model EmployerScore {
+  id              String               @id @default(cuid())
+  employerId      String
+  employer        Employer             @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  applicationId   String?
+  application     Application?         @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  policyVersionId String
+  policyVersion   ScoringPolicyVersion @relation(fields: [policyVersionId], references: [id])
+
+  /// 0–100, weighted from the components. Null when data is too thin to score.
+  totalScore Int?
+  /// A | B | C | D | E  (E = decline / enhanced review)
+  tier       String?
+
+  identityConfidence Int?
+  financialHealth    Int?
+  payrollReliability Int?
+  behaviouralTrust   Int?
+  compliance         Int?
+  industryContext    Int?
+
+  /// highly_stable | stable | moderately_variable | stressed |
+  /// materially_distressed
+  payrollClassification String?
+  /// green | amber | red
+  earlyWarningLevel     String  @default("green")
+
+  /// blocked | enhanced_due_diligence | committee_referral | decline | clear
+  knockoutOutcome String @default("clear")
+
+  /// Months of payroll history and bank data available — the honest measure of
+  /// how much this score is worth.
+  payrollMonthsAvailable   Int     @default(0)
+  financialMonthsAvailable Int     @default(0)
+  /// True when a component fell back to a data-insufficiency floor.
+  hasDataGaps              Boolean @default(false)
+
+  /// system | manual | scheduled | event
+  trigger           String   @default("manual")
+  calculatedBy      String?
+  calculatedByLabel String?
+  calculatedAt      DateTime @default(now())
+
+  components           ScoreComponent[]
+  metrics              FinancialMetric[]
+  knockouts            KnockoutEvaluation[]
+  limitRecommendations LimitRecommendation[]
+  decisions            CreditDecision[]
+
+  @@index([employerId, calculatedAt])
+  @@index([applicationId])
+  @@index([tier])
+}
+
+/// One of the six weighted components of a score, with its explanation.
+model ScoreComponent {
+  id      String        @id @default(cuid())
+  scoreId String
+  score   EmployerScore @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+
+  /// identity | financial | payroll | behavioural | compliance | industry
+  component        String
+  label            String
+  /// 0–100 before weighting.
+  rawScore         Int?
+  /// Percent weight applied, from the policy version.
+  weight           Float
+  /// rawScore × weight ÷ 100 — the contribution to the total.
+  weightedScore    Float
+  /// strong | acceptable | watch | weak | critical | insufficient_data
+  classification   String
+  /// JSON array of {factor, effect, detail} — what moved this component, in
+  /// plain language, for the explainability panel.
+  factors          String?
+  /// Plain-language summary. Shown to internal users; never AI chain-of-thought.
+  explanation      String?
+  /// True where the component was floored for want of data.
+  dataInsufficient Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@unique([scoreId, component])
+}
+
+/// The result of evaluating one knockout rule in one scoring run.
+///
+/// Stored even when it passes: "we checked sanctions and it was clear" is
+/// itself the evidence, and an absent row would be indistinguishable from a
+/// check that never ran.
+model KnockoutEvaluation {
+  id      String        @id @default(cuid())
+  scoreId String
+  score   EmployerScore @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+
+  /// Key into the policy version's knockoutRules.
+  rule        String
+  label       String
+  /// pass | triggered | not_assessable
+  result      String
+  /// blocked | enhanced_due_diligence | committee_referral | decline
+  consequence String?
+  overridable Boolean @default(false)
+  /// Human-readable why. Shown in the decision memorandum.
+  detail      String?
+  /// Which data proved it.
+  evidence    String?
+
+  overriddenAt       DateTime?
+  overriddenBy       String?
+  overriddenByLabel  String?
+  overrideReason     String?
+  /// A second authoriser, required for override by the authority matrix.
+  overrideSecondedBy String?
+
+  createdAt DateTime @default(now())
+
+  @@index([scoreId, result])
+}
+
+/// A deterministic limit recommendation. A RECOMMENDATION: it becomes a real
+/// limit only when a CreditDecision by an authorised human says so.
+model LimitRecommendation {
+  id      String        @id @default(cuid())
+  scoreId String
+  score   EmployerScore @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+
+  /// ewa | payroll_buffer | payroll_financing
+  product             String
+  /// For EWA: the percentage of accrued wages made available.
+  availabilityPercent Float?
+  /// Aggregate employer exposure cap.
+  aggregateLimit      Decimal? @db.Decimal(18, 2)
+  /// Per-employee cap, EWA only.
+  employeeCap         Decimal? @db.Decimal(18, 2)
+  /// Per-cycle cap.
+  cycleCap            Decimal? @db.Decimal(18, 2)
+  maxTenorDays        Int?
+  pricingTier         String?
+  repaymentSource     String?
+  /// JSON array of required security / guarantees.
+  securityRequired    String?
+  /// JSON array of required reserves or direct-debit mandates.
+  reserveRequired     String?
+  /// JSON array of {input, value} — the numbers the calculation used.
+  inputs              String?
+  /// The arithmetic, in words.
+  formula             String?
+  /// Which policy cap bound the result, where a cap was hit.
+  bindingConstraint   String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([scoreId, product])
+}
+
+/// One AI assessment. Advisory only, and structurally incapable of deciding:
+/// nothing in the decision service reads this table.
+model AiAssessment {
+  id            String       @id @default(cuid())
+  employerId    String
+  employer      Employer     @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  /// openai | anthropic | azure_openai | stub
+  provider      String
+  model         String
+  /// Prompt template version, e.g. "eir-analyst-v1".
+  promptVersion String
+  /// JSON array naming the data sources authorised into the prompt. Names of
+  /// sources, never their contents.
+  inputSources  String
+  /// sha256 of the rendered prompt — proves what was asked without storing
+  /// employer data twice.
+  promptHash    String
+
+  // ---- The validated structured output ----
+  assessmentSummary           String?
+  /// JSON string arrays.
+  positiveFactors             String?
+  riskFactors                 String?
+  inconsistencies             String?
+  missingInformation          String?
+  sectorContext               String?
+  recommendedAnalystQuestions String?
+  earlyWarningSignals         String?
+  /// 0–100 self-reported confidence. Displayed, never used as a weight.
+  confidenceLevel             Int?
+  requiresHumanReview         Boolean @default(true)
+
+  /// valid | schema_invalid | provider_error | refused
+  outcome         String  @default("valid")
+  validationError String?
+  /// The raw response, retained for audit. Sensitive: reviewer roles only.
+  rawResponse     String?
+  latencyMs       Int?
+  tokensIn        Int?
+  tokensOut       Int?
+
+  requestedBy      String
+  requestedByLabel String?
+  createdAt        DateTime @default(now())
+
+  /// Human amendment of AI text. Recorded, not overwritten.
+  amendedBy      String?
+  amendedByLabel String?
+  amendedAt      DateTime?
+  amendmentNote  String?
+
+  @@index([employerId, createdAt])
+  @@index([applicationId])
+}
+
+/// A human analyst's own assessment, including any override of a classification.
+model AnalystReview {
+  id            String       @id @default(cuid())
+  employerId    String
+  employer      Employer     @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  /// financial | payroll | monitoring_note | stress_scenario |
+  /// classification_override | information_request
+  reviewType  String
+  authorId    String
+  authorLabel String
+  authorRole  String
+
+  summary       String
+  /// Mandatory where a classification is being changed. The whole point of the
+  /// override path is that the reasoning is on the record.
+  justification String?
+  /// For an override: what it was and what it became.
+  previousValue String?
+  newValue      String?
+  /// JSON for a stress scenario: assumptions and results.
+  scenario      String?
+  /// True for notes visible only to credit staff — never to the employer or a
+  /// relationship manager.
+  confidential  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employerId, createdAt])
+  @@index([applicationId, reviewType])
+}
+
+/// A compliance check: KYB, PEP, sanctions, AML, adverse media.
+model ComplianceCheck {
+  id         String   @id @default(cuid())
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  /// cac_verification | tin_verification | sanctions | pep | aml |
+  /// adverse_media | litigation | regulatory_licence | ubo_completeness
+  checkType String
+  /// clear | possible_match | confirmed_match | failed | pending |
+  /// not_applicable
+  result    String  @default("pending")
+  /// manual | provider_api
+  method    String  @default("manual")
+  provider  String?
+  /// What was screened — a company name or a director's name.
+  subject   String?
+  /// JSON: provider payload, already redacted of identity numbers.
+  findings  String?
+  /// Human-readable, safe to put in a memorandum.
+  summary   String?
+
+  /// The compliance clearance decision, which is a human act.
+  clearedBy       String?
+  clearedByLabel  String?
+  clearedAt       DateTime?
+  /// approved | rejected | pending
+  clearanceStatus String    @default("pending")
+  rejectionReason String?
+
+  checkedAt DateTime  @default(now())
+  /// Screening goes stale. Set so monitoring can re-run it.
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employerId, checkType])
+  @@index([employerId, clearanceStatus])
+  @@index([expiresAt])
+}
+
+/// A credit-bureau enquiry. Separate from ComplianceCheck: a bureau enquiry is
+/// consented, billable and legally distinct from a sanctions screen.
+model BureauCheck {
+  id         String   @id @default(cuid())
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  provider    String
+  /// company | director | beneficial_owner
+  subjectType String
+  subjectName String?
+  /// The consent row that authorised this enquiry. An enquiry with no consent
+  /// is a compliance incident, so the link is stored on the enquiry itself.
+  consentId   String?
+
+  /// Deterministic summary of the report.
+  score                 Int?
+  scoreBand             String?
+  totalExposure         Decimal? @db.Decimal(18, 2)
+  activeFacilities      Int?
+  delinquentFacilities  Int?
+  worstDelinquencyDays  Int?
+  /// JSON array of undisclosed obligations found — feeds the material
+  /// undisclosed borrowing knockout rule.
+  undisclosedFacilities String?
+  /// Redacted provider payload.
+  rawSummary            String?
+
+  /// clear | adverse | materially_adverse | no_record | provider_error
+  outcome          String    @default("no_record")
+  requestedBy      String?
+  requestedByLabel String?
+  checkedAt        DateTime  @default(now())
+  expiresAt        DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([employerId, checkedAt])
+}
+
+/// An alert: early-warning, compliance or operational.
+model Alert {
+  id         String   @id @default(cuid())
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  /// Key into ALERT_RULES (risk/monitoring.ts).
+  rule     String
+  /// payroll | financial | compliance | behavioural | document | external
+  category String
+  /// amber | red
+  severity String
+  title    String
+  /// Plain language. Shown to internal users; a subset is shown to employers.
+  detail   String
+  /// Which data triggered it.
+  evidence String?
+
+  /// open | acknowledged | resolved | dismissed
+  status       String  @default("open")
+  /// JSON array of automated actions taken, e.g. ["restrict_utilisation"].
+  actionsTaken String?
+
+  acknowledgedBy  String?
+  acknowledgedAt  DateTime?
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  resolutionNote  String?
+  /// Mandatory to dismiss — a dismissed red alert needs a name against it.
+  dismissalReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employerId, status])
+  @@index([severity, status])
+  @@index([createdAt])
+}
+
+/// A credit decision by an authorised human.
+///
+/// `decidedBy` is NOT nullable. That is the schema-level guarantee that no
+/// automated or AI path can write a decision: there is no way to insert a row
+/// without naming the administrator who made it.
+model CreditDecision {
+  id              String               @id @default(cuid())
+  employerId      String
+  employer        Employer             @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  applicationId   String
+  application     Application          @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  /// The score the decision was taken on.
+  scoreId         String?
+  score           EmployerScore?       @relation(fields: [scoreId], references: [id], onDelete: SetNull)
+  policyVersionId String
+  policyVersion   ScoringPolicyVersion @relation(fields: [policyVersionId], references: [id])
+
+  /// approve | approve_with_conditions | pilot_approval | defer |
+  /// request_information | refer_to_committee | decline
+  decision          String
+  /// Mandatory. Human-readable, and the employer-facing reason is derived from
+  /// it, so it must be safe to show.
+  reason            String
+  /// Internal deliberation. Never exposed to the employer or a relationship
+  /// manager — see the API's field-level scoping.
+  internalRationale String?
+
+  decidedBy       String
+  decidedByLabel  String
+  decidedByRole   String
+  /// credit_administrator | head_of_risk | managing_director |
+  /// credit_committee | board
+  authorityLevel  String
+  /// Set where the authority matrix demanded two authorisers.
+  secondedBy      String?
+  secondedByLabel String?
+  secondedAt      DateTime?
+
+  /// JSON array of conditions attached to an approval.
+  conditions            String?
+  /// When the approval itself lapses if not taken up.
+  expiresAt             DateTime?
+  /// True where this decision departs from the deterministic recommendation.
+  isOverride            Boolean   @default(false)
+  /// Mandatory when isOverride.
+  overrideJustification String?
+  /// What the engine recommended, kept beside what the human chose.
+  recommendedTier       String?
+  recommendedLimit      Decimal? @db.Decimal(18, 2)
+  approvedLimit         Decimal? @db.Decimal(18, 2)
+
+  decidedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  votes  ApprovalVote[]
+  limits CreditLimit[]
+
+  @@index([employerId, decidedAt])
+  @@index([applicationId])
+  @@index([decision])
+}
+
+/// One committee member's independent vote.
+model ApprovalVote {
+  id         String         @id @default(cuid())
+  decisionId String
+  decision   CreditDecision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  voterId    String
+  voterLabel String
+  voterRole  String
+  /// approve | approve_with_conditions | decline | defer | abstain
+  vote       String
+  comment    String?
+  /// JSON array of conditions this voter attaches.
+  conditions String?
+
+  votedAt DateTime @default(now())
+
+  @@unique([decisionId, voterId])
+}
+
+/// An approved facility limit in force.
+model CreditLimit {
+  id            String         @id @default(cuid())
+  employerId    String
+  employer      Employer       @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  applicationId String?
+  application   Application?   @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  decisionId    String
+  decision      CreditDecision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  /// ewa | payroll_buffer | payroll_financing
+  product             String
+  approvedAmount      Decimal  @db.Decimal(18, 2)
+  /// Reduced by monitoring without a new decision — the restriction path.
+  availableAmount     Decimal  @db.Decimal(18, 2)
+  availabilityPercent Float?
+  employeeCap         Decimal? @db.Decimal(18, 2)
+  cycleCap            Decimal? @db.Decimal(18, 2)
+  maxTenorDays        Int?
+  pricingTier         String?
+  currency            String  @default("NGN")
+
+  /// active | suspended | reduced | expired | closed
+  status            String    @default("active")
+  restrictionReason String?
+  restrictedBy      String?
+  restrictedAt      DateTime?
+
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  reviewDueAt   DateTime?
+
+  /// Whether the employer has acknowledged the facility terms.
+  termsAcknowledgedAt DateTime?
+  termsAcknowledgedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  utilisations Utilisation[]
+  repayments   Repayment[]
+  covenants    Covenant[]
+
+  @@index([employerId, status])
+  @@index([reviewDueAt])
+}
+
+/// A drawdown against a limit.
+///
+/// EMPLOYEE PRIVACY: for EWA this is deliberately an AGGREGATE per cycle, not
+/// per employee. `participantCount` is the only employee-level fact recorded,
+/// so an employer cannot learn which of their staff drew on wages.
+model Utilisation {
+  id         String      @id @default(cuid())
+  employerId String
+  employer   Employer    @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  limitId    String
+  limit      CreditLimit @relation(fields: [limitId], references: [id], onDelete: Cascade)
+
+  product           String
+  amount            Decimal   @db.Decimal(18, 2)
+  /// For EWA: how many employees drew in this cycle. Never who.
+  participantCount  Int?
+  /// The payroll cycle this draw sits against.
+  cyclePeriodStart  DateTime?
+  drawnAt           DateTime  @default(now())
+  dueAt             DateTime?
+  /// outstanding | settled | overdue | written_off
+  status            String    @default("outstanding")
+  outstandingAmount Decimal?  @db.Decimal(18, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employerId, drawnAt])
+  @@index([limitId, status])
+}
+
+/// A repayment. Feeds behavioural trust deterministically.
+model Repayment {
+  id            String       @id @default(cuid())
+  employerId    String
+  employer      Employer     @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  limitId       String?
+  limit         CreditLimit? @relation(fields: [limitId], references: [id], onDelete: SetNull)
+  utilisationId String?
+
+  amount        Decimal   @db.Decimal(18, 2)
+  dueAt         DateTime
+  paidAt        DateTime?
+  /// early | on_time | late | missed | partial
+  timeliness    String    @default("on_time")
+  daysLate      Int       @default(0)
+  /// direct_debit | transfer | payroll_deduction | offset
+  method        String?
+  /// True where a settlement attempt failed.
+  failed        Boolean   @default(false)
+  failureReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employerId, dueAt])
+  @@index([limitId])
+}
+
+/// A condition the employer must keep meeting after approval.
+model Covenant {
+  id         String       @id @default(cuid())
+  employerId String
+  employer   Employer     @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  limitId    String?
+  limit      CreditLimit? @relation(fields: [limitId], references: [id], onDelete: SetNull)
+
+  /// Key into COVENANT_TYPES, e.g. monthly_payroll_upload,
+  /// minimum_salary_coverage, no_additional_borrowing.
+  covenantType String
+  description  String
+  /// Where the covenant is numeric.
+  threshold    Float?
+  comparator   String?
+  /// monthly | quarterly | per_cycle | annual | continuous
+  frequency    String  @default("monthly")
+
+  /// compliant | breached | waived | pending
+  status         String    @default("pending")
+  lastTestedAt   DateTime?
+  lastTestResult String?
+  breachedAt     DateTime?
+  waivedBy       String?
+  waivedReason   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employerId, status])
+}
+
+/// A periodic review of an active employer — the "continuous" in continuous
+/// monitoring, recorded so a missed review is visible.
+model MonitoringReview {
+  id         String   @id @default(cuid())
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  /// scheduled | event_driven | annual | ad_hoc
+  reviewType  String
+  dueAt       DateTime
+  completedAt DateTime?
+  /// pending | in_progress | completed | overdue
+  status      String    @default("pending")
+
+  /// Snapshot at review time.
+  scoreAtReview        Int?
+  tierAtReview         String?
+  earlyWarningAtReview String?
+  /// maintain | increase | reduce | restrict | suspend | exit
+  outcome              String?
+  summary              String?
+  reviewerId           String?
+  reviewerLabel        String?
+  nextReviewDate       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employerId, dueAt])
+  @@index([status, dueAt])
+}
+
+/// External information about an employer: news, litigation, awards, indicators.
+///
+/// NOT treated as fact. `analystValidation` starts at `unvalidated` and nothing
+/// here affects a score until a risk analyst has validated it — which is why
+/// the validation columns are on the row rather than in a separate workflow.
+model ExternalIntelligence {
+  id         String   @id @default(cuid())
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  /// credit_bureau | corporate_registry | sanctions_db | court_record |
+  /// regulatory_notice | adverse_media | procurement_award |
+  /// industry_indicator | macro_indicator
+  sourceType  String
+  sourceName  String
+  sourceUrl   String?
+  publishedAt DateTime?
+  retrievedAt DateTime  @default(now())
+
+  headline      String?
+  /// AI may write this. It is a summary of a source, not a finding of fact.
+  summary       String?
+  /// Whether an AI model produced the summary, and which.
+  summarisedBy  String?
+  /// none | low | medium | high | critical — proposed relevance, pre-validation.
+  riskRelevance String  @default("none")
+
+  /// unvalidated | validated_material | validated_immaterial | rejected
+  analystValidation String    @default("unvalidated")
+  validatedBy       String?
+  validatedByLabel  String?
+  validatedAt       DateTime?
+  validationNote    String?
+  /// True only once an analyst has marked it material. The scoring engine reads
+  /// this flag and nothing else from this table.
+  affectsScore      Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employerId, retrievedAt])
+  @@index([employerId, analystValidation])
+}
+
+// ===========================================================================
+// Accessibility, language and support
+//
+// Everything below exists to make PayBridge usable by people the default design
+// excludes: blind and low-vision users, people with limited hand movement, deaf
+// and hard-of-hearing users, people new to smartphones, people who do not read
+// English comfortably, and people with low financial literacy.
+//
+// ONE RULE GOVERNS THIS WHOLE SECTION: it stores what a person needs the
+// INTERFACE to do, never why. There is no diagnosis column, no disability
+// column, no medical note — not as a placeholder, not "for later". A person who
+// turns on bigger writing has told us to use bigger writing and nothing else,
+// and the absence of a column is the only guarantee that cannot be misconfigured.
+// ===========================================================================
+
+/// One row per person: how PayBridge should behave for them.
+///
+/// Deliberately ONE table rather than the four the brief named
+/// (user_preferences, accessibility_preferences, language_preferences,
+/// support_preferences). Each of those would have been a single row keyed by the
+/// same userId, read together on every page load and written together by one
+/// form — four tables would mean four joins and four chances to disagree about
+/// which is authoritative, for no gained capability. The column groups below are
+/// commented with the names they came from.
+///
+/// EMPLOYERS MUST NEVER READ THIS TABLE. Nothing employer-facing joins to it;
+/// see the reads in src/routes/preferences.ts, which are keyed by session user
+/// id and never by employer. Support staff may read it only through the support
+/// dashboard, which logs every read.
+model UserPreference {
+  id String @id @default(cuid())
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // ---- language_preferences ----
+  /// en | pcm | yo | ha | ig. Persisted server-side so the language survives a
+  /// new phone, a cleared browser or a borrowed device — the people most likely
+  /// to need Pidgin are the least likely to have one permanent device.
+  locale       String @default("en")
+  /// default | onboarding | profile — where the choice came from. Tells us
+  /// whether a person actively chose English or merely never changed it.
+  localeSource String @default("default")
+
+  // ---- accessibility_preferences: FUNCTIONAL ONLY ----
+  largeText    Boolean @default(false)
+  highContrast Boolean @default(false)
+  simpleView   Boolean @default(false)
+  /// Shows a Listen button beside money information. It does NOT autoplay.
+  readAloud    Boolean @default(false)
+  reduceMotion Boolean @default(false)
+
+  // ---- support_preferences ----
+  /// whatsapp | written | phone | callback | email
+  supportChannel      String    @default("whatsapp")
+  /// "Do not phone me." Honoured by staff tooling, not just by the form.
+  textOnly            Boolean   @default(false)
+  /// The person asked for a human to walk them through setup.
+  assistedOnboarding  Boolean   @default(false)
+  assistedRequestedAt DateTime?
+
+  // ---- first-use flow ----
+  /// Set when the six setup questions are answered, or skipped. Either way the
+  /// questions do not appear again uninvited.
+  onboardingCompletedAt DateTime?
+  onboardingSkippedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// A request for help, from any channel, always ending in a ticket.
+///
+/// Contact details are copied onto the row at submission rather than read
+/// through the user relation, because a ticket has to stay answerable after the
+/// account is suspended, the email is changed, or the request came from someone
+/// who could not sign in at all — which is precisely when help is needed.
+model SupportTicket {
+  id String @id @default(cuid())
+
+  /// Quotable on a phone call: PB-S-7K4M. Not the primary key; the primary key
+  /// is a cuid nobody can read aloud.
+  reference String @unique
+
+  /// Null for a request from someone not signed in.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  name  String
+  email String
+  phone String?
+
+  /// whatsapp | written | phone | callback | email — how they asked to be
+  /// answered, honoured in that order.
+  channel            String
+  /// The language to REPLY in. Copied from preferences at submission so a later
+  /// language change does not retroactively alter an open conversation.
+  locale             String  @default("en")
+  textOnly           Boolean @default(false)
+  /// They asked for help using the app itself, not just an answer.
+  assistedOnboarding Boolean @default(false)
+  /// Free text: "after 6pm", "mornings". Not a scheduler, just what they said.
+  callbackWindow     String?
+
+  subject String
+  body    String
+
+  /// open | in_progress | waiting_on_customer | resolved
+  status            String  @default("open")
+  /// normal | high | vulnerable
+  priority          String  @default("normal")
+  /// Raised by staff when someone may be at risk of harm — financial distress,
+  /// coercion, confusion about what they have agreed to. Escalation is a flag on
+  /// the ticket rather than a separate queue so it cannot be lost in a handoff.
+  vulnerabilityFlag Boolean @default(false)
+  vulnerabilityNote String?
+
+  /// AdminUser id, plus a label so a closed ticket still names its owner after
+  /// that administrator leaves.
+  assignedTo      String?
+  assignedToLabel String?
+  assignedAt      DateTime?
+
+  resolvedAt     DateTime?
+  resolvedBy     String?
+  resolutionNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages SupportTicketMessage[]
+
+  @@index([status, createdAt])
+  @@index([userId])
+  @@index([assignedTo, status])
+  @@index([priority, status])
+}
+
+/// One message on a ticket. Append-only in practice: staff correct the record by
+/// adding to it, so a customer can never be shown a conversation that was
+/// quietly rewritten.
+model SupportTicketMessage {
+  id String @id @default(cuid())
+
+  ticketId String
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  /// customer | staff | system
+  authorType  String
+  authorId    String?
+  authorLabel String
+
+  body String
+
+  /// A staff-only note. NEVER returned by any customer-facing endpoint — the
+  /// filter lives in the query, not in the template.
+  internal Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+/// The registry of wordings people are asked to accept, per language.
+///
+/// A consent is only meaningful if we can prove WHAT was shown, in WHICH
+/// language. Translating terms creates a new row, not an edit — otherwise a
+/// Pidgin speaker's acceptance points at English text they never saw.
+model ConsentVersion {
+  id String @id @default(cuid())
+
+  /// terms | privacy | bridge_terms | accessibility_statement | data_processing
+  slug    String
+  version String
+  /// en | pcm | yo | ha | ig
+  locale  String @default("en")
+
+  title    String
+  /// Plain-language summary shown above the full text. Read aloud by the Listen
+  /// button, so it must stand alone as spoken English or Pidgin.
+  summary  String
+  bodyUrl  String?
+  /// sha256 of the exact text published under this version and language.
+  bodyHash String?
+
+  effectiveFrom DateTime  @default(now())
+  retiredAt     DateTime?
+
+  acceptances UserConsent[]
+
+  @@unique([slug, version, locale])
+  @@index([slug, effectiveFrom])
+}
+
+/// One person accepting one wording version. The employer equivalent is the
+/// older `Consent` model; this is the individual-customer side.
+model UserConsent {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  consentVersionId String
+  consentVersion   ConsentVersion @relation(fields: [consentVersionId], references: [id], onDelete: Restrict)
+
+  granted     Boolean   @default(true)
+  /// Which language the person was reading when they accepted. Usually the same
+  /// as the version's locale; recorded separately because a fallback to English
+  /// is possible and must be visible afterwards.
+  readLocale  String    @default("en")
+  ip          String?
+  userAgent   String?
+  acceptedAt  DateTime  @default(now())
+  withdrawnAt DateTime?
+
+  @@unique([userId, consentVersionId])
+  @@index([userId, acceptedAt])
+}
+
+/// A record that a member of staff looked at a customer's private information.
+///
+/// Separate from AuditEvent on purpose. AuditEvent records CHANGES; this records
+/// READS, which are far more numerous and are the thing that actually goes wrong
+/// with support tooling — nobody edits a stranger's file out of curiosity, they
+/// read it. Keeping reads apart means the change trail stays legible instead of
+/// drowning in views.
+model SupportAccessLog {
+  id String @id @default(cuid())
+
+  /// AdminUser id, plus label for the same reason as above.
+  adminId    String
+  adminLabel String
+  adminRole  String
+
+  /// ticket | preferences | assisted_queue | ticket_list
+  resource      String
+  resourceId    String?
+  /// The customer whose information was reached, when there is one.
+  subjectUserId String?
+
+  /// read | write | export
+  action String  @default("read")
+  /// Why the staff member was entitled to see it — the role permission that
+  /// allowed it, recorded at the moment of access rather than inferred later
+  /// from a role that may since have changed.
+  basis  String?
+
+  ip        String?
+  requestId String?
+  createdAt DateTime @default(now())
+
+  @@index([adminId, createdAt])
+  @@index([subjectUserId, createdAt])
+  @@index([resource, createdAt])
+}

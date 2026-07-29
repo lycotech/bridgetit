@@ -1,0 +1,95 @@
+# PayBridge — HTTP security response headers
+#
+# Format: Netlify / Cloudflare Pages `_headers`. Vite copies public/ verbatim
+# into dist/, so this ships with the build.
+#
+# WHY THIS FILE EXISTS SEPARATELY FROM THE CSP META TAG
+# Three of the most important headers cannot be delivered by a <meta> tag —
+# browsers ignore them there by specification:
+#   * frame-ancestors  (clickjacking)
+#   * Strict-Transport-Security (protocol downgrade)
+#   * X-Content-Type-Options / COOP / CORP
+# So the meta tag (see vite-csp-plugin.ts) is the portable floor, and this file
+# is the real policy wherever the host honours it.
+#
+# IF YOU MOVE HOSTS: this exact file only works on Netlify/Cloudflare Pages.
+# On nginx/Caddy/S3+CloudFront/Vercel these must be re-expressed in that host's
+# config. Header security is a property of the SERVER, not of the code — a
+# redeploy onto a host that ignores this file silently removes every
+# protection below.
+#
+# THIS APP DEPLOYS TO VERCEL, which does NOT read this file — Vercel headers
+# are configured in webapp/vercel.json's "headers" array instead (kept in sync
+# with this file by hand). This file is left in place only in case the app is
+# ever redeployed to a host that does honour it.
+
+/*
+  # --- Clickjacking -------------------------------------------------------
+  # WHY: without this, any site can iframe PayBridge invisibly over their own
+  # buttons and harvest a click on "Approve and Process Payroll" or a Bridge
+  # request. The victim is authenticated, so the action succeeds. This is the
+  # single cheapest attack against a money-moving dashboard.
+  #
+  # Production policy: no cross-origin iframe embedding at all. (The former
+  # Vibecode preview allowlist is gone along with the Vibecode dependencies —
+  # see CLAUDE.md's migration notes.)
+  Content-Security-Policy: frame-ancestors 'self'
+  X-Frame-Options: SAMEORIGIN
+
+  # --- Transport ----------------------------------------------------------
+  # WHY: payroll and identity data must never traverse plaintext HTTP, and the
+  # first request is where an attacker on the network downgrades the connection.
+  # 2 years + preload is the value required for the browser preload list.
+  # includeSubDomains covers any api./app. subdomain added later.
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+
+  # --- MIME confusion -----------------------------------------------------
+  # WHY: stops the browser sniffing an uploaded/user-supplied file served as
+  # text/plain and deciding it is HTML or JavaScript — a stored-XSS route that
+  # bypasses every input filter, because the payload never went through one.
+  X-Content-Type-Options: nosniff
+
+  # --- Referrer leakage ---------------------------------------------------
+  # WHY: dashboard URLs contain employer and employee identifiers. The browser
+  # default still leaks our origin to third parties; "same-origin" leaks nothing
+  # off-site. Payroll URLs are themselves sensitive data.
+  Referrer-Policy: same-origin
+
+  # --- Capability reduction ------------------------------------------------
+  # WHY: an XSS or a malicious third-party script cannot silently open the
+  # camera, microphone or geolocation, and cannot read payment credentials.
+  # publickey-credentials-get stays enabled for self because passkey/WebAuthn
+  # MFA is on the roadmap and disabling it now would quietly block that work.
+  Permissions-Policy: accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), publickey-credentials-get=(self), screen-wake-lock=(), usb=(), xr-spatial-tracking=()
+
+  # --- Cross-origin isolation ----------------------------------------------
+  # WHY COOP: severs the window.opener relationship, so a page we link to (or
+  # one that opens us) cannot reach into our window object or navigate us.
+  # WHY CORP same-site: stops other origins embedding our resources as a way to
+  # infer content through side channels (Spectre-class and XS-Leaks).
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-site
+
+  # WHY: gives the origin its own agent cluster, hardening it against
+  # cross-origin memory-sharing side channels.
+  Origin-Agent-Cluster: ?1
+
+  # WHY: neutralises legacy Adobe crossdomain.xml policy files, which could
+  # otherwise grant a hosted plugin cross-origin read access to this origin.
+  X-Permitted-Cross-Domain-Policies: none
+
+# --- Caching of application HTML ------------------------------------------
+# WHY: HTML is the document that carries the session context. Caching it in a
+# shared proxy risks serving one user's rendered shell to another, and caching
+# it locally means a logged-out user can press Back and see the dashboard.
+# Hashed JS/CSS assets are safe to cache forever; the HTML entry point is not.
+/index.html
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+
+/
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+
+# Hashed build assets are immutable by construction — the filename changes when
+# the content does, so a long cache is both safe and a performance win.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

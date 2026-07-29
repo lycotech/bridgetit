@@ -1,0 +1,59 @@
+# dependencies (npm install)
+node_modules
+
+# output
+out
+dist
+*.tgz
+
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+server.log
+studio.log
+
+# dotenv environment variable files
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
+
+# Prisma generated files (npx prisma generate)
+/generated/prisma
+
+# --- Secrets -----------------------------------------------------------------
+# WHY: a committed .env is the single most common way production credentials
+# leak. Git history is permanent — deleting the file later does NOT remove the
+# secret from earlier commits, and anyone who ever cloned the repo keeps it.
+# Only .env.example (placeholders, no real values) belongs in version control.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
+
+# Audit logs contain real personal and payroll data.
+audit.log
+
+# Locally held mail outbox. Never in version control: it holds verification,
+# recovery and invitation codes in plaintext. Git history is permanent, so a
+# single committed file is a permanent disclosure. (KYC documents now live in
+# S3-compatible object storage, not on local disk — see src/storage/kyc.ts.)
+.data/outbox/

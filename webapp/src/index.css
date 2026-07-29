@@ -1,0 +1,485 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   PayBridge design system — deep navy + emerald teal + gold
+   All colors in HSL.
+
+     Navy Ink       #091320   hsl(214 56% 8%)    --background
+     Deep Teal      #13725A   hsl(165 72% 26%)   --primary-deep
+     Emerald Teal   #22B490   hsl(165 68% 42%)   --primary
+     Bright Teal    #21DEAF   hsl(165 74% 50%)   --success
+     Gold           #D6B166   hsl(40 58% 62%)    --gold
+     Warm White     #F8F6F2   hsl(40 30% 96%)    --foreground
+
+   The ground is a cool navy and everything structural — cards,
+   borders, steel — is pulled onto its hue (214), so the surface never
+   argues with the accent. Teal sits at hue 165 in three depths: deep
+   for weight and gradient anchors, emerald for identity and fills,
+   bright for outcome. One colour read at three distances, not three
+   decisions.
+
+   Gold is the warm pole and the only hue far from the other two. It is
+   what stops a navy-and-teal palette reading cold and technical: money
+   that has been earned, held, or flagged for attention. It stays a
+   *state* colour and a trim — never a surface, never a second brand.
+
+   Type is a warm off-white rather than pure white, which is what keeps
+   the gold from looking like a foreign object on the page.
+   ============================================================ */
+
+@layer base {
+  :root {
+    /* Navy ink — the ground. Deep enough that teal and gold both read as
+       lit objects on top of it rather than as tinted panels. */
+    --background: 214 56% 8%;
+    /* Warm off-white, not pure white: it shares the gold's warmth, so the
+       two never look like they came from different systems. */
+    --foreground: 40 30% 96%;
+
+    --card: 214 44% 12%;
+    --card-foreground: 40 30% 96%;
+
+    --popover: 214 46% 11%;
+    --popover-foreground: 40 30% 96%;
+
+    /* Emerald Teal #22B490 — the identity colour. 7.1:1 on ink, and dark
+       navy type on a filled teal button is also 7.1:1, so it works as a
+       fill and as type without a second tone. */
+    --primary: 165 68% 42%;
+    --primary-foreground: 214 60% 8%;
+
+    /* Deep Teal #13725A — the weight: gradient anchors, dark teal blocks,
+       the near foot of the bridge. White on it is 5.9:1. */
+    --primary-deep: 165 72% 26%;
+    /* The lifted tone, for teal that has to be *read* on ink at small
+       sizes — eyebrows, links, thin rules (10.8:1). */
+    --primary-bright: 165 66% 58%;
+
+    --secondary: 214 40% 16%;
+    --secondary-foreground: 40 30% 96%;
+
+    --muted: 214 34% 16%;
+    /* Lifted for readable body copy on ink (9.8:1) */
+    --muted-foreground: 210 20% 75%;
+
+    /* Neutral interactive surface (menus, hovers) — not a brand colour.
+       Gold lives in --gold so a hover state can never spend it. */
+    --accent: 214 38% 20%;
+    --accent-foreground: 40 30% 96%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 40 30% 96%;
+
+    --border: 214 34% 20%;
+    --input: 214 34% 20%;
+    --ring: 165 68% 42%;
+
+    --radius: 0.75rem;
+
+    /* Bright Teal #21DEAF — positive outcome only: settled, verified,
+       cleared, paid. 10.8:1 on ink, so it can carry text and not just a
+       dot. Its foreground is ink, never white. */
+    --success: 165 74% 50%;
+    --success-foreground: 214 60% 8%;
+
+    /* Financial-state tokens for the bridge timeline. They read left to
+       right as the money moves: earned (deep teal, banked but locked),
+       available (bright teal, yours today), protected (steel blue, held
+       back on purpose). Hue and depth do the work, so a stacked bar
+       separates without needing labels. */
+    --earned: 165 55% 46%;
+    --available: 165 74% 50%;
+    --protected: 205 42% 58%;
+    /* Gold — the warm pole. Caution, attention, in-build, and the far
+       bank of the prosperity ramp. Never a surface. */
+    --gold: 40 58% 62%;
+
+    /* Sidebar */
+    --sidebar-background: 214 46% 11%;
+    --sidebar-foreground: 40 30% 96%;
+    --sidebar-primary: 165 68% 42%;
+    --sidebar-primary-foreground: 214 60% 8%;
+    --sidebar-accent: 214 40% 16%;
+    --sidebar-accent-foreground: 40 30% 96%;
+    --sidebar-border: 214 34% 20%;
+    --sidebar-ring: 165 68% 42%;
+  }
+
+  .dark {
+    --background: 214 56% 8%;
+    --foreground: 40 30% 96%;
+    --card: 214 44% 12%;
+    --card-foreground: 40 30% 96%;
+    --popover: 214 46% 11%;
+    --popover-foreground: 40 30% 96%;
+    --primary: 165 68% 42%;
+    --primary-foreground: 214 60% 8%;
+    --primary-deep: 165 72% 26%;
+    --primary-bright: 165 66% 58%;
+    --secondary: 214 40% 16%;
+    --secondary-foreground: 40 30% 96%;
+    --muted: 214 34% 16%;
+    --muted-foreground: 210 20% 75%;
+    --accent: 214 38% 20%;
+    --accent-foreground: 40 30% 96%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 40 30% 96%;
+    --border: 214 34% 20%;
+    --input: 214 34% 20%;
+    --ring: 165 68% 42%;
+    --success: 165 74% 50%;
+    --success-foreground: 214 60% 8%;
+    --earned: 165 55% 46%;
+    --available: 165 74% 50%;
+    --protected: 205 42% 58%;
+    --gold: 40 58% 62%;
+  }
+
+  /* Warm-white section scope — flips semantic tokens for light passages.
+     Every accent drops in lightness rather than changing hue: emerald
+     goes to #147B61 (4.9:1 on the page, 5.2:1 under white type) and gold
+     to a bronze, because #D6B166 is 2.0:1 on white and a brand colour
+     that cannot be read is not a brand colour. The paper is warm, not
+     cool, so it reads as the same brand with the lights on. */
+  .theme-light {
+    --background: 40 30% 97%;
+    --foreground: 214 45% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 214 45% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 214 45% 13%;
+    --primary: 165 72% 28%;
+    --primary-foreground: 40 30% 98%;
+    --primary-deep: 165 74% 20%;
+    --primary-bright: 165 72% 26%;
+    --secondary: 214 22% 93%;
+    --secondary-foreground: 214 45% 13%;
+    --muted: 214 20% 94%;
+    --muted-foreground: 214 16% 40%;
+    --accent: 214 22% 92%;
+    --accent-foreground: 214 45% 13%;
+    --border: 214 20% 87%;
+    --input: 214 20% 87%;
+    --ring: 165 72% 28%;
+    --success: 165 76% 24%;
+    --success-foreground: 40 30% 98%;
+    --earned: 165 52% 34%;
+    --available: 165 70% 28%;
+    --protected: 205 40% 42%;
+    --gold: 38 60% 34%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Manrope", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Inter", "Manrope", sans-serif;
+    letter-spacing: -0.022em;
+  }
+
+  /* Respect reduced-motion preferences globally */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+
+  /* Accessible, visible focus states */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+/* ============================================================
+   ACCESSIBILITY MODES
+
+   Switched on from "How should PayBridge work for you?" and applied to
+   <html> by PreferencesProvider, so they also cover anything rendered
+   into document.body — dialogs, dropdowns, toasts. A high-contrast
+   mode that stops at the edge of a modal is not a high-contrast mode.
+
+   Three separate switches, not one "accessibility theme": somebody may
+   need bigger writing and nothing else, and bundling the three would
+   force them to accept a look they did not ask for.
+   ============================================================ */
+@layer base {
+  /* ---- Bigger writing --------------------------------------------------
+     One change: the root font size. Every size in the product is set in
+     rem through Tailwind, so this scales type, padding, gaps and touch
+     targets together and nothing overlaps. 19px from 16px is ~119% —
+     enough to matter, small enough that no layout breaks. It stacks with
+     browser zoom, so a person who needs 200% still gets 200% of this.  */
+  html.pb-large-text {
+    font-size: 118.75%;
+  }
+
+  /* ---- High contrast ---------------------------------------------------
+     Pure black ground, pure white type: 21:1. The brand hues stay
+     recognisably teal and gold but are lifted to the top of their range,
+     because the point is not to abandon the identity — it is to make it
+     survive a cracked screen in direct sunlight.                         */
+  html.pb-high-contrast {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 165 80% 62%;
+    --primary-foreground: 0 0% 0%;
+    --primary-deep: 165 80% 40%;
+    --primary-bright: 165 85% 70%;
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 14%;
+    /* Not a dimmed grey. "Muted" in high contrast means *quieter in
+       hierarchy*, not harder to read — supporting copy is where the fee
+       and the repayment date live. */
+    --muted-foreground: 0 0% 93%;
+    --accent: 0 0% 18%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 90% 68%;
+    --destructive-foreground: 0 0% 0%;
+    --border: 0 0% 62%;
+    --input: 0 0% 72%;
+    --ring: 60 100% 62%;
+    --success: 165 85% 66%;
+    --success-foreground: 0 0% 0%;
+    --earned: 165 70% 58%;
+    --available: 165 85% 66%;
+    --protected: 205 80% 74%;
+    --gold: 45 95% 70%;
+  }
+
+  /* The warm-white passages, in high contrast: white paper, black ink. */
+  html.pb-high-contrast .theme-light {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+    --primary: 165 90% 20%;
+    --primary-foreground: 0 0% 100%;
+    --primary-deep: 165 90% 14%;
+    --primary-bright: 165 90% 18%;
+    --secondary: 0 0% 92%;
+    --secondary-foreground: 0 0% 0%;
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 16%;
+    --accent: 0 0% 90%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 90% 32%;
+    --border: 0 0% 32%;
+    --input: 0 0% 28%;
+    --ring: 240 100% 30%;
+    --success: 165 90% 20%;
+    --gold: 35 90% 24%;
+  }
+
+  /* A thicker, yellow focus ring: the outline is the only thing telling a
+     keyboard user where they are, and 2px of teal on near-black is the
+     first casualty of a poor screen. */
+  html.pb-high-contrast :focus-visible {
+    outline: 3px solid hsl(var(--ring));
+    outline-offset: 3px;
+  }
+
+  /* Gradients and washes are removed rather than adjusted. Type over a
+     gradient has a different contrast ratio at each end, so there is no
+     single value that passes; a flat fill has one, and it passes. */
+  html.pb-high-contrast .bg-prosperity,
+  html.pb-high-contrast .bg-twotone {
+    background-image: none;
+    background-color: hsl(var(--card));
+  }
+
+  html.pb-high-contrast .btn-brand {
+    background-image: none;
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
+
+  /* Clipped-gradient text becomes solid type. Left alone it renders as
+     transparent glyphs, which in high contrast is an invisible heading. */
+  html.pb-high-contrast .text-prosperity {
+    background-image: none;
+    color: hsl(var(--foreground));
+    -webkit-text-fill-color: hsl(var(--foreground));
+  }
+
+  html.pb-high-contrast .bg-grid {
+    background-image: none;
+  }
+
+  /* Deliberate translucency defeats a contrast mode wherever it is used
+     on TYPE. Surfaces may stay soft; words may not. */
+  html.pb-high-contrast .disclaimer,
+  html.pb-high-contrast .text-muted-foreground\/75,
+  html.pb-high-contrast .text-muted-foreground\/70,
+  html.pb-high-contrast .text-foreground\/85,
+  html.pb-high-contrast .text-foreground\/90,
+  html.pb-high-contrast .text-foreground\/80 {
+    color: hsl(var(--foreground));
+  }
+
+  html.pb-high-contrast hr,
+  html.pb-high-contrast .border-border {
+    border-color: hsl(var(--border));
+  }
+
+  /* ---- Less movement ---------------------------------------------------
+     The same rules as the prefers-reduced-motion block above, available as
+     an explicit choice. Not everyone who needs it knows their operating
+     system has the switch, and on a shared phone they may not be able to
+     change it.                                                            */
+  html.pb-reduce-motion {
+    scroll-behavior: auto;
+  }
+
+  html.pb-reduce-motion *,
+  html.pb-reduce-motion *::before,
+  html.pb-reduce-motion *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  /* Display type — Inter, tightened. Per the brand typography spec. */
+  .font-display {
+    font-family: "Inter", "Manrope", sans-serif;
+    letter-spacing: -0.022em;
+  }
+
+  /* The logo wordmark. Separated from .font-display so the lockup can never
+     be pulled out of shape by a change to heading styles. */
+  .font-brand {
+    font-family: "Inter", "Manrope", sans-serif;
+    font-feature-settings: "cv11" 1;
+  }
+
+  /* Tabular figures for money */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* The payroll-to-prosperity ramp — the whole palette in one sweep: deep
+     teal at the near bank, emerald mid-span, gold at the far one. Cool to
+     warm is what makes the crossing legible as a *change*; a teal-only
+     ramp would just be a lighting effect. Used for spans, meters and any
+     element that represents crossing — never for a flat surface, where it
+     would just look busy. */
+  .bg-prosperity {
+    background-image: linear-gradient(
+      100deg,
+      hsl(var(--primary-deep)) 0%,
+      hsl(var(--primary)) 42%,
+      hsl(var(--success)) 68%,
+      hsl(var(--gold)) 96%
+    );
+  }
+
+  /* The two teals alone, for surfaces that need weight and a lit edge but
+     no outcome claim — headers, feature panels, the app shell. */
+  .bg-twotone {
+    background-image: linear-gradient(
+      135deg,
+      hsl(var(--primary-deep)) 0%,
+      hsl(var(--primary)) 100%
+    );
+  }
+
+  /* Every dominant call to action in the product wears the same fill, so
+     "the teal button" is one object the user learns once. Emerald at the
+     bottom-left, bright teal at the top-right — the lit half of the ramp,
+     so the ink label clears AA at both ends (7.1:1 and 10.8:1). The deep
+     tone is deliberately left out: it would need white type at one end of
+     the same button. */
+  .btn-brand {
+    background-image: linear-gradient(
+      135deg,
+      hsl(var(--primary)) 0%,
+      hsl(var(--success)) 100%
+    );
+    color: hsl(var(--primary-foreground));
+  }
+
+  /* Same ramp on type. Kept to short phrases — a gradient across a
+     paragraph costs contrast at the pale end. */
+  .text-prosperity {
+    background-image: linear-gradient(
+      100deg,
+      hsl(var(--foreground)) 0%,
+      hsl(var(--foreground)) 34%,
+      hsl(var(--success)) 76%,
+      hsl(var(--gold)) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Section eyebrow / label. Uses the lifted teal rather than --primary:
+     at 12px uppercase with 0.22em tracking, thin strokes need the headroom
+     (10.8:1 rather than 7.1:1). */
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em];
+    color: hsl(var(--primary-bright));
+  }
+
+  /* Subtle atmospheric grid used behind dark sections */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.5) 1px, transparent 1px);
+    background-size: 64px 64px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 40%, transparent 100%);
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 40%, transparent 100%);
+  }
+
+  /* Section vertical rhythm — tightened on mobile to remove repetitive space
+     while preserving premium breathing room on larger screens. */
+  .section {
+    @apply py-16 md:py-28;
+  }
+
+  /* Compact variant for supporting sections */
+  .section-tight {
+    @apply py-14 md:py-24;
+  }
+
+  /* Secondary notes / disclaimers only — never primary explanations */
+  .disclaimer {
+    @apply text-muted-foreground/75;
+  }
+}

@@ -1,0 +1,74 @@
+# PayBridge — public marketing site.
+#
+# Disallowed for every crawler: the private demonstration environment (its
+# sign-in screens and the employee, employer, investor and operations portals),
+# the administrator portal at /admin, and signed-in customer pages under
+# /account. They are also unlinked from public navigation, excluded from
+# sitemap.xml, served with noindex, and — the part that actually matters —
+# unreadable without a server-issued session. Disallow is the polite layer, not
+# the protective one.
+#
+# /register and /sign-in are deliberately NOT disallowed: public customer
+# registration is a front-door page and should be findable.
+
+User-agent: Googlebot
+Allow: /
+Disallow: /private-demo
+Disallow: /paybridge-admin
+Disallow: /admin
+Disallow: /login
+Disallow: /select-role
+Disallow: /forgot-password
+Disallow: /verify
+Disallow: /account
+Disallow: /employee/
+Disallow: /employer/
+Disallow: /investor/
+Disallow: /operations/
+Disallow: /api/
+
+User-agent: Bingbot
+Allow: /
+Disallow: /private-demo
+Disallow: /paybridge-admin
+Disallow: /admin
+Disallow: /login
+Disallow: /select-role
+Disallow: /forgot-password
+Disallow: /verify
+Disallow: /account
+Disallow: /employee/
+Disallow: /employer/
+Disallow: /investor/
+Disallow: /operations/
+Disallow: /api/
+
+User-agent: Twitterbot
+Allow: /
+Disallow: /private-demo
+Disallow: /paybridge-admin
+Disallow: /admin
+
+User-agent: facebookexternalhit
+Allow: /
+Disallow: /private-demo
+Disallow: /paybridge-admin
+Disallow: /admin
+
+User-agent: *
+Allow: /
+Disallow: /private-demo
+Disallow: /paybridge-admin
+Disallow: /admin
+Disallow: /login
+Disallow: /select-role
+Disallow: /forgot-password
+Disallow: /verify
+Disallow: /account
+Disallow: /employee/
+Disallow: /employer/
+Disallow: /investor/
+Disallow: /operations/
+Disallow: /api/
+
+Sitemap: https://getpaybridge.com/sitemap.xml

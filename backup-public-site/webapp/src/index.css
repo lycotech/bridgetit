@@ -1,0 +1,200 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   PayBridge design system
+   Deep navy · PayBridge green · warm white · muted gold
+   All colors in HSL.
+   ============================================================ */
+
+@layer base {
+  :root {
+    /* Dark navy is the dominant, default theme */
+    --background: 214 56% 8%;
+    --foreground: 40 30% 96%;
+
+    --card: 214 44% 12%;
+    --card-foreground: 40 30% 96%;
+
+    --popover: 214 46% 11%;
+    --popover-foreground: 40 30% 96%;
+
+    /* PayBridge green (the continuous swoosh) */
+    --primary: 165 68% 42%;
+    --primary-foreground: 214 60% 8%;
+
+    --secondary: 214 40% 16%;
+    --secondary-foreground: 40 30% 96%;
+
+    --muted: 214 34% 16%;
+    /* Lifted for readable primary body copy on navy (meets WCAG AA) */
+    --muted-foreground: 210 20% 75%;
+
+    /* Muted warm gold — used very sparingly */
+    --accent: 40 58% 62%;
+    --accent-foreground: 214 60% 8%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 40 30% 96%;
+
+    --border: 214 34% 20%;
+    --input: 214 34% 20%;
+    --ring: 165 68% 42%;
+
+    --radius: 0.75rem;
+
+    /* Financial-state tokens for the bridge timeline */
+    --earned: 165 55% 46%;
+    --available: 165 74% 50%;
+    --protected: 205 42% 58%;
+    --gold: 40 58% 62%;
+
+    /* Sidebar (unused on marketing site but kept valid) */
+    --sidebar-background: 214 46% 11%;
+    --sidebar-foreground: 40 30% 96%;
+    --sidebar-primary: 165 68% 42%;
+    --sidebar-primary-foreground: 214 60% 8%;
+    --sidebar-accent: 214 40% 16%;
+    --sidebar-accent-foreground: 40 30% 96%;
+    --sidebar-border: 214 34% 20%;
+    --sidebar-ring: 165 68% 42%;
+  }
+
+  .dark {
+    --background: 214 56% 8%;
+    --foreground: 40 30% 96%;
+    --card: 214 44% 12%;
+    --card-foreground: 40 30% 96%;
+    --popover: 214 46% 11%;
+    --popover-foreground: 40 30% 96%;
+    --primary: 165 68% 42%;
+    --primary-foreground: 214 60% 8%;
+    --secondary: 214 40% 16%;
+    --secondary-foreground: 40 30% 96%;
+    --muted: 214 34% 16%;
+    --muted-foreground: 210 20% 75%;
+    --accent: 40 58% 62%;
+    --accent-foreground: 214 60% 8%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 40 30% 96%;
+    --border: 214 34% 20%;
+    --input: 214 34% 20%;
+    --ring: 165 68% 42%;
+    --earned: 165 55% 46%;
+    --available: 165 74% 50%;
+    --protected: 205 42% 58%;
+    --gold: 40 58% 62%;
+  }
+
+  /* Warm-white section scope — flips semantic tokens for light passages */
+  .theme-light {
+    --background: 40 30% 97%;
+    --foreground: 214 45% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 214 45% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 214 45% 13%;
+    --primary: 165 66% 36%;
+    --primary-foreground: 40 30% 98%;
+    --secondary: 214 22% 93%;
+    --secondary-foreground: 214 45% 13%;
+    --muted: 214 20% 94%;
+    --muted-foreground: 214 16% 40%;
+    --accent: 38 52% 48%;
+    --accent-foreground: 40 30% 98%;
+    --border: 214 20% 87%;
+    --input: 214 20% 87%;
+    --ring: 165 66% 36%;
+    --earned: 165 52% 40%;
+    --available: 165 70% 40%;
+    --protected: 205 40% 48%;
+    --gold: 38 55% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Manrope", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Bricolage Grotesque", "Manrope", sans-serif;
+  }
+
+  /* Respect reduced-motion preferences globally */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+
+  /* Accessible, visible focus states */
+  :focus-visible {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+@layer components {
+  .font-display {
+    font-family: "Bricolage Grotesque", "Manrope", sans-serif;
+  }
+
+  /* Tabular figures for money */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Section eyebrow / label */
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-primary;
+  }
+
+  /* Subtle atmospheric grid used behind dark sections */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.5) 1px, transparent 1px);
+    background-size: 64px 64px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 40%, transparent 100%);
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 40%, transparent 100%);
+  }
+
+  /* Section vertical rhythm — tightened on mobile to remove repetitive space
+     while preserving premium breathing room on larger screens. */
+  .section {
+    @apply py-16 md:py-28;
+  }
+
+  /* Compact variant for supporting sections */
+  .section-tight {
+    @apply py-14 md:py-24;
+  }
+
+  /* Secondary notes / disclaimers only — never primary explanations */
+  .disclaimer {
+    @apply text-muted-foreground/75;
+  }
+}

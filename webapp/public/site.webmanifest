@@ -1,0 +1,28 @@
+{
+  "name": "PayBridge",
+  "short_name": "PayBridge",
+  "description": "From payroll to prosperity.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#091320",
+  "theme_color": "#091320",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

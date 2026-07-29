@@ -1,0 +1,59 @@
+# ==========================================================================
+# PayBridge — production .htaccess for cPanel / Apache shared hosting
+# Place this file in the same directory as index.html (your web root).
+# ==========================================================================
+
+Options -MultiViews
+RewriteEngine On
+
+# --- Force HTTPS ----------------------------------------------------------
+RewriteCond %{HTTPS} off
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# --- Canonical: redirect www to non-www -----------------------------------
+RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
+
+# --- SPA fallback: serve index.html for client-side routes ----------------
+# Existing files and directories are served directly; everything else
+# falls through to the single-page app so /privacy, /terms, /contact work.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+RewriteRule ^ index.html [L]
+
+# --- Custom 404 (only reached for non-HTML asset requests) ----------------
+ErrorDocument 404 /index.html
+
+# --- Compression ----------------------------------------------------------
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml
+  AddOutputFilterByType DEFLATE application/javascript application/json
+  AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>
+
+# --- Caching --------------------------------------------------------------
+<IfModule mod_expires.c>
+  ExpiresActive On
+  # Hashed build assets can be cached aggressively
+  <FilesMatch "\.(js|css|woff2?|ttf|otf|eot)$">
+    ExpiresDefault "access plus 1 year"
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "\.(png|jpe?g|gif|svg|ico|webp|avif)$">
+    ExpiresDefault "access plus 6 months"
+  </FilesMatch>
+  # HTML should always be revalidated
+  <FilesMatch "\.html$">
+    ExpiresDefault "access plus 0 seconds"
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+</IfModule>
+
+# --- Security headers -----------------------------------------------------
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set X-Frame-Options "SAMEORIGIN"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+  Header set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+</IfModule>

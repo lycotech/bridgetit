@@ -1,0 +1,40 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://REPLACE_WITH_RENDER_BACKEND_URL.onrender.com/api/:path*"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "frame-ancestors 'self'" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "same-origin" },
+        {
+          "key": "Permissions-Policy",
+          "value": "accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), publickey-credentials-get=(self), screen-wake-lock=(), usb=(), xr-spatial-tracking=()"
+        },
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+        { "key": "Cross-Origin-Resource-Policy", "value": "same-site" },
+        { "key": "Origin-Agent-Cluster", "value": "?1" },
+        { "key": "X-Permitted-Cross-Domain-Policies", "value": "none" }
+      ]
+    },
+    {
+      "source": "/",
+      "headers": [{ "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate, max-age=0" }]
+    },
+    {
+      "source": "/index.html",
+      "headers": [{ "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate, max-age=0" }]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    }
+  ]
+}

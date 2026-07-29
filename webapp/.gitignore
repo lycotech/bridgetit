@@ -1,0 +1,35 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# --- Secrets -----------------------------------------------------------------
+# WHY: even though every VITE_-prefixed variable is compiled into the public
+# JavaScript bundle (and is therefore NOT a secret), .env files here routinely
+# pick up backend URLs, API keys pasted by mistake, and per-developer config.
+# Keep them out of git; commit .env.example with placeholders instead.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
