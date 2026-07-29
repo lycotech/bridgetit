@@ -18,6 +18,11 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // backend/src/types.ts is imported directly for shared Zod schemas, but
+      // on Vercel only webapp's dependencies are installed — backend/node_modules
+      // doesn't exist, so plain node resolution of "zod" from that file fails.
+      // Force it to webapp's own copy regardless of which file imports it.
+      zod: path.resolve(__dirname, "./node_modules/zod"),
     },
   },
   build: {
