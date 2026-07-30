@@ -10,6 +10,7 @@ import type { Portal } from "@/lib/platform/models";
 import { platformApi, qk } from "@/lib/platform/mock-service";
 import { relativeTime } from "@/lib/platform/format";
 import { usePreferences } from "@/lib/prefs/PreferencesProvider";
+import { endDemoSession, useDemoSession } from "@/lib/demo-access";
 import { PORTAL_LABEL, PORTAL_NAV } from "./navigation";
 import type { NavSection } from "./navigation";
 
@@ -27,6 +28,11 @@ export function DashboardShell({ portal }: { portal: Portal }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [mobileOpen, setMobileOpen] = useState(false);
+  // The invitation that opened this demo session is scoped to one portal
+  // server-side (DemoInvitation.portal). The role switcher below must not
+  // offer roles outside that portal, or the scoping is decorative.
+  const { data: demoSession } = useDemoSession();
+  const switchableRoles = ROLE_LIST.filter((role) => role.portal === demoSession?.portal);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -108,10 +114,20 @@ export function DashboardShell({ portal }: { portal: Portal }) {
               roleLabel={meta.label}
               organisation={user.organisation}
               onSignOut={() => {
+                /*
+                 * signOut() only clears the client-side "which role am I
+                 * demoing as" state. It does NOT touch the server-issued
+                 * pb_demo cookie that RequireDemoAccess checks — without this
+                 * call, "signing out" just bounced back into /demo/login,
+                 * which is itself still behind the still-valid demo gate.
+                 * endDemoSession() is what actually ends the invitation grant.
+                 */
+                void endDemoSession().catch(() => {});
                 signOut();
                 queryClient.clear();
-                navigate("/demo/login");
+                navigate("/private-demo");
               }}
+              roles={switchableRoles}
               onSwitchRole={switchRole}
             />
           </div>
@@ -321,6 +337,7 @@ function UserMenu({
   roleLabel,
   organisation,
   onSignOut,
+  roles,
   onSwitchRole,
 }: {
   name: string;
@@ -328,6 +345,7 @@ function UserMenu({
   roleLabel: string;
   organisation?: string;
   onSignOut: () => void;
+  roles: typeof ROLE_LIST;
   onSwitchRole: (role: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -378,17 +396,19 @@ function UserMenu({
           </div>
 
           <div className="p-2">
-            <button
-              type="button"
-              onClick={() => setShowRoles((v) => !v)}
-              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground"
-            >
-              <Repeat className="h-4 w-4" />
-              Switch demo role
-            </button>
+            {roles.length > 1 ? (
+              <button
+                type="button"
+                onClick={() => setShowRoles((v) => !v)}
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground"
+              >
+                <Repeat className="h-4 w-4" />
+                Switch demo role
+              </button>
+            ) : null}
             {showRoles ? (
               <ul className="mb-1 max-h-64 overflow-y-auto rounded-xl border border-border/70 bg-card p-1">
-                {ROLE_LIST.map((role) => (
+                {roles.map((role) => (
                   <li key={role.role}>
                     <button
                       type="button"
