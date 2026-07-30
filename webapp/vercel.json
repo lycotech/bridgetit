@@ -3,6 +3,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://bridgetit.onrender.com/api/:path*"
+    },
+    {
+      "source": "/((?!api/|assets/|favicon|robots.txt|sitemap.xml).*)",
+      "destination": "/index.html"
     }
   ],
   "headers": [
