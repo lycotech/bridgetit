@@ -44,6 +44,10 @@ import VerifyEmail from "./pages/account/VerifyEmail";
 import VerifyIdentity from "./pages/account/VerifyIdentity";
 import AccountHome from "./pages/account/AccountHome";
 import { RequireGate, RedirectIfSignedIn as RedirectIfCustomerSignedIn } from "@/components/account/AccountGate";
+import EmployerPortalRegister from "./pages/employer-portal/Register";
+import EmployerPortalLogin from "./pages/employer-portal/Login";
+import EmployerPortalHome from "./pages/employer-portal/Home";
+import EmployerPortalAcceptInvite from "./pages/employer-portal/AcceptInvite";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import Verify from "./pages/auth/Verify";
 import SelectRole from "./pages/auth/SelectRole";
@@ -179,6 +183,19 @@ const App = () => (
                 </RequireGate>
               }
             />
+
+            {/* ----------------------------------------------------------------
+                EMPLOYER PORTAL — a company's own multi-seat login.
+
+                Deliberately a different namespace from /employer/* below, which
+                is the demonstration dashboard (mock data, behind the private
+                demo gate). These four routes are real: they create and sign
+                into an actual Employer company record via /api/employer/*.
+               ---------------------------------------------------------------- */}
+            <Route path="/employer-portal/register" element={<EmployerPortalRegister />} />
+            <Route path="/employer-portal/login" element={<EmployerPortalLogin />} />
+            <Route path="/employer-portal/accept-invite" element={<EmployerPortalAcceptInvite />} />
+            <Route path="/employer-portal" element={<EmployerPortalHome />} />
 
             {/* The gate in front of the private demonstration environment. */}
             <Route path="/private-demo" element={<PrivateDemo />} />

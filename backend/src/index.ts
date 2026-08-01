@@ -9,12 +9,14 @@ import { sampleRouter } from "./routes/sample";
 import { waitlistRouter } from "./routes/waitlist";
 import { registrationsRouter } from "./routes/registrations";
 import { authRouter } from "./routes/auth";
+import { employerRouter } from "./routes/employer";
 import { adminRouter } from "./routes/admin";
 import { adminAuthRouter } from "./routes/admin-auth";
 import { invitationsRouter } from "./routes/admin-invitations";
 import { auditRouter } from "./routes/admin-audit";
 import { adminUsersRouter } from "./routes/admin-users";
 import { supportAdminRouter } from "./routes/admin-support";
+import { adminKycRouter } from "./routes/admin-kyc";
 import { preferencesRouter } from "./routes/preferences";
 import { consentsRouter } from "./routes/consents";
 import { supportRouter } from "./routes/support";
@@ -27,6 +29,7 @@ import { isAllowedOrigin, isProduction } from "./security/config";
 import { accessLog, audit } from "./security/audit";
 import { SESSION_COOKIE_NAME } from "./security/session";
 import { ADMIN_COOKIE, DEMO_COOKIE } from "./security/staff-session";
+import { EMPLOYER_SESSION_COOKIE } from "./security/employer-session";
 
 const app = new Hono();
 
@@ -118,7 +121,10 @@ app.use("*", rateLimit({ name: "global", limit: 300, windowMs: 60_000 }));
 //    All three session families are named here: the customer session, the admin
 //    dashboard session and the private-demo session. Leaving the admin cookie
 //    out would exempt the highest-privilege surface from the token check.
-app.use("*", csrfProtection({ cookieNames: [SESSION_COOKIE_NAME, ADMIN_COOKIE, DEMO_COOKIE] }));
+app.use(
+  "*",
+  csrfProtection({ cookieNames: [SESSION_COOKIE_NAME, ADMIN_COOKIE, DEMO_COOKIE, EMPLOYER_SESSION_COOKIE] }),
+);
 
 // Health check. Deliberately returns nothing about versions, build, git sha,
 // database status or uptime — a health endpoint is the first thing scanned, and
@@ -134,6 +140,9 @@ app.route("/api/registrations", registrationsRouter);
 // This is the only one of the three access routes that belongs in the main
 // navigation. It cannot reach the admin portal or the private demonstration.
 app.route("/api/auth", authRouter);
+// A company's own multi-seat login — separate session, separate cookie, from
+// the individual customer accounts above. See routes/employer.ts.
+app.route("/api/employer", employerRouter);
 // Session-gated: how PayBridge should behave for one person. Functional
 // preferences only, keyed by the session's own user id, with no employer-facing
 // counterpart anywhere in the service.
@@ -166,6 +175,9 @@ app.route("/api/admin/admins", adminUsersRouter);
 // And ahead of /api/admin: the support desk. Reads are logged as well as
 // writes, and the ticket shape it returns has nowhere to put a financial field.
 app.route("/api/admin/support", supportAdminRouter);
+// And ahead of /api/admin: KYC review. Decrypted identity fields are returned
+// only from this router, one case at a time, each read logged.
+app.route("/api/admin/kyc", adminKycRouter);
 app.route("/api/admin", adminRouter);
 app.route("/api/demo", demoRouter);
 

@@ -8,7 +8,7 @@ an agent picking up work here doesn't have to rediscover it by reading 70 pages 
 files. **Keep this updated as work lands** — when something moves from "not built" to "built,"
 move the line, don't just add a new one.
 
-Last audited: 2026-07-30.
+Last audited: 2026-08-01.
 
 ---
 
@@ -36,7 +36,7 @@ PRD.md names 14 backend services. Here is what actually exists for each, in
 | **Notifications** | ⚠️ Partial | `email/mailer.ts` — real SMTP/Resend send with safe log-only dev fallback, wired into registration/verification/support/welcome flows. Email only — no SMS/push. Currently unconfigured in production (no `MAIL_TRANSPORT`/`SMTP_HOST`/`RESEND_API_KEY` set), so OTP/verification emails are silently not sent — see §5. |
 | **Risk & Compliance** | ⚠️ Built, not wired | `backend/src/eir/risk/*` — a complete, tested scoring/decisioning engine (identity/financial/payroll/behavioural/compliance/industry scoring, knockouts, composite score, limit recommendation, an authority-matrix approval workflow). **No route calls it.** No file outside `eir/` imports from it. It is the only tested code in the backend (`risk.test.ts`, ~50 cases) but is unreachable from any API. |
 | **Employee Management** | ⚠️ Partial | Real: registration, KYC submission + document upload (`auth.ts`). Missing: no employer-side roster/eligibility management route — an employer cannot view or manage "their" employees for real. |
-| **Employer Management** | ❌ Not built | No `employer.ts`/equivalent route exists. `Employer`/`EmployerUser`/`EmployerContact` Prisma models exist but nothing outside the admin CRM lead pipeline (which manages *registration/lead* records, not live employer accounts) reads or writes them. There is no employer-facing account/roster API. |
+| **Employer Management** | ✅ Built (2026-08-01) | `backend/src/routes/employer.ts` (mounted at `/api/employer`) + `backend/src/security/employer-session.ts` — a real, separate multi-seat login for a company (`EmployerUser`, own session cookie, own `employer_admin`/`employer_contributor`/`employer_viewer` roles). Register creates a real `Employer` row. Company profile read/update, team list, invite-by-email (signed stateless token, no schema change needed), accept-invite, suspend/reinstate. Real frontend at `/employer-portal/{register,login,accept-invite}` and a minimal (not the polished mock dashboard) home page. **Not done**: this is NOT wired to the existing `/employer/*` demo dashboard (`webapp/src/pages/employer/*`), which is still 100% mock data behind the private demo gate — see the row below and §3. Connecting that dashboard to this real service is separate follow-up work. |
 | **Payroll Engine** | ❌ Not built | `PayrollCycle`/`PayrollRecord`/`EmployeeRecord` models exist (annotated as feeding the risk engine) but zero routes read or write them. Frontend payroll data is a seeded pseudo-random generator (`webapp/src/lib/platform/payroll-data.ts`) — no upload, no sync, no provider integration. |
 | **Eligibility Engine** | ❌ Not built | No route or module computes "is this employee eligible for a Bridge right now." Nothing enforces the eligibility preconditions listed in PRD.md's Business Rules. |
 | **Bridge Engine** | ❌ Not built | No route creates/approves/tracks a Bridge (earned-wage draw). The employee "Bridge" page is 100% mock data (`webapp/src/lib/platform/mock-service.ts`). |
@@ -59,7 +59,7 @@ Mapping PRD.md's flow (`Employer onboarded → ... → Repayment completed`) to 
 
 | Step | Status |
 |---|---|
-| Employer onboarded | ❌ No employer account/onboarding route (Employer Management not built) |
+| Employer onboarded | ✅ Real (2026-08-01) — `POST /api/employer/register` creates a real `Employer` + first `employer_admin`. Downstream steps (payroll, eligibility) still don't consume this yet. |
 | Payroll uploaded/synchronised | ❌ Not built (Payroll Engine) |
 | Employees invited | ⚠️ Partial — demo invitations exist (`admin-invitations.ts`) but that's the *pre-launch demo* invite, not an employer inviting its real workforce |
 | Employee completes KYC | ✅ Real — submission, encryption, document upload all work |
@@ -73,16 +73,21 @@ Mapping PRD.md's flow (`Employer onboarded → ... → Repayment completed`) to 
 
 **Only the first real step of the entire pipeline — KYC — is functional today.** Everything
 from "Eligibility calculated" onward is either unimplemented or (for Risk validation) built but
-unreachable. There is also **no KYC review queue**: `admin/portal/KycReview.tsx` is a literal
-`<SectionInBuild>` placeholder and no backend route approves/rejects a submitted case, so a KYC
-submission can reach `pending` and then goes nowhere without a direct DB edit.
+unreachable.
+
+✅ **KYC review queue is now built** (2026-08-01): `backend/src/routes/admin-kyc.ts` (mounted at
+`/api/admin/kyc`) — `GET /queue` (paginated, filterable by status), `GET /:userId` (decrypted
+case detail, logged), `GET /:userId/documents/:documentId/view-url` (5-minute presigned R2
+link), `POST /:userId/decision` (approve/reject, gated on `kyc.decide`). Real UI at
+`webapp/src/pages/admin/portal/KycReview.tsx`. A KYC submission can now actually reach
+`approved`/`rejected`, not just `pending`.
 
 ## 4. MVP Deliverables checklist (per PRD.md)
 
 | Deliverable | Status |
 |---|---|
-| Employer onboarding | ❌ |
-| Employee registration and KYC | ✅ registration/submission real; ❌ review/approval step |
+| Employer onboarding | ✅ backend + minimal real UI (2026-08-01); not yet wired to the polished `/employer/*` dashboard |
+| Employee registration and KYC | ✅ registration/submission real; ✅ review/approval step (2026-08-01) |
 | Payroll upload/synchronisation | ❌ |
 | Eligibility calculation | ❌ |
 | Bridge request workflow | ❌ |
@@ -95,27 +100,48 @@ submission can reach `pending` and then goes nowhere without a direct DB edit.
 | Admin console | ✅ real, working today |
 | Basic investor dashboard | ❌ mock UI only |
 
-## 5. Known live-environment issues (fix before demoing to anyone external)
+## 5. Known live-environment issues
 
-- **Mail transport is unconfigured in production** — no `MAIL_TRANSPORT`/`SMTP_HOST`/
-  `RESEND_API_KEY` set on Render, so verification-code emails silently never send (the mailer
-  never throws, by design — see `email/mailer.ts`). Registration completes but the user is
-  stuck on `/verify-email` forever. Needs Resend or SMTP configured on Render.
-- **`ALLOWED_ORIGINS`** on Render must exactly match every origin the frontend is actually
-  served from (e.g. `https://getpaybridge.com`, `https://www.getpaybridge.com`) — a mismatch
-  here causes every unsafe request (register, login, etc.) to fail with a deliberately generic
-  `"Request rejected."` (403) from `security/csrf.ts`'s origin check.
+Resolved since the 2026-07-30 audit:
+- ✅ Vercel build failure (webapp couldn't resolve `zod` from `backend/src/types.ts`) — fixed
+  via an alias in `webapp/vite.config.ts`.
+- ✅ All required Render env vars set (`SESSION_SECRET`, `LOG_SALT`, `KYC_ENCRYPTION_KEY`,
+  `ADMIN_PASSWORD_HASH`, `KYC_S3_*` for Cloudflare R2).
+- ✅ `ALLOWED_ORIGINS` on Render now matches the live frontend origin(s) — was causing every
+  unsafe request to fail with a generic `"Request rejected."` (403) from `security/csrf.ts`.
+- ✅ `webapp/vercel.json` — placeholder Render URL replaced with the real one; added a SPA
+  catch-all rewrite so direct navigation to client-side routes (e.g. `/paybridge-admin`,
+  `/private-demo`) no longer 404s on Vercel.
+- ✅ Demo environment logout bug — sign-out only cleared client-side mock role state, never
+  the server-issued `pb_demo` cookie, so users couldn't actually leave the demo. Fixed in
+  `webapp/src/components/dashboard/DashboardShell.tsx` to call `POST /api/demo/logout`.
+- ✅ Demo role switcher now scoped to the invitation's assigned portal (was: any demo viewer
+  could switch to any of the four portals regardless of what their invitation was issued for).
 
-## 6. Suggested priority order (engineering judgment, not committed roadmap)
+Still open:
+- ⏳ **Mail transport** — being configured now (Resend). Until verified working end-to-end
+  (registration → OTP email arrives → verify succeeds), treat registration as broken in
+  production: the mailer never throws on missing config, so failures are silent.
 
-Following PRD.md's own business flow, in dependency order:
+## 5a. How to re-verify after the Resend setup lands
 
-1. **Fix the live-environment issues in §5** — nothing else matters if new users can't verify
-   their email today.
+1. Confirm `MAIL_TRANSPORT=resend` and `RESEND_API_KEY` are set on Render, and that
+   `getpaybridge.com` shows verified in Resend's domain list.
+2. Register a fresh test account on the live site.
+3. Confirm the OTP email actually arrives (check spam too — a freshly verified sending domain
+   has no sender reputation yet).
+4. Confirm `/verify-email` accepts the code and lands on the real account home.
+5. Once confirmed, flip this section's status to ✅ and move on to §6 item 1.
+
+## 6. Working punch list (current — updated 2026-08-01)
+
+Following PRD.md's own business flow, in dependency order. This is the live, ordered backlog —
+tick items off here as they land rather than treating this as a static plan.
+
+1. ⏳ **Verify mail end-to-end** (§5a) — in progress now (Resend).
 2. **KYC review queue** — smallest scope of the missing pieces, unblocks "can a real employee
    actually get approved," no external dependency.
-3. **Employer Management** — a real employer account/onboarding path; everything downstream
-   (payroll, eligibility, employees invited) depends on an employer existing for real.
+3. ✅ **Employer Management** — done (2026-08-01), see §2.
 4. **Payroll Engine** — even manual CSV upload against the existing `PayrollCycle`/
    `PayrollRecord` models is enough for a pilot; needed before real employee balances mean
    anything.

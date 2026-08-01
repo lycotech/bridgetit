@@ -791,6 +791,128 @@ export const kycStatusSchema = z.object({
 export type KycStatusView = z.infer<typeof kycStatusSchema>;
 
 /* ==========================================================================
+ *  EMPLOYER ACCOUNTS — a company's own multi-seat login
+ *
+ *  Separate from the customer `User` table on purpose: an employer is a
+ *  company with a team (HR, finance, a founder), not one person. The first
+ *  person to register becomes `employer_admin` and can invite colleagues,
+ *  each with their own login. See backend/src/security/employer-session.ts.
+ * ========================================================================== */
+
+export const EMPLOYER_TEAM_ROLES = ["employer_admin", "employer_contributor", "employer_viewer"] as const;
+export type EmployerTeamRole = (typeof EMPLOYER_TEAM_ROLES)[number];
+
+export const EMPLOYER_TEAM_ROLE_LABELS: Record<EmployerTeamRole, string> = {
+  employer_admin: "Admin",
+  employer_contributor: "Contributor",
+  employer_viewer: "Viewer",
+};
+
+export const EMPLOYER_STATUSES = [
+  "onboarding",
+  "submitted",
+  "under_review",
+  "approved",
+  "conditionally_approved",
+  "declined",
+  "active",
+  "restricted",
+  "suspended",
+  "closed",
+] as const;
+export type EmployerStatus = (typeof EMPLOYER_STATUSES)[number];
+
+export const registerEmployerSchema = z.object({
+  companyName: z.string().trim().min(2, "Enter your company's name.").max(200),
+  fullName: z.string().trim().min(2, "Enter your full name.").max(200),
+  email: z.string().trim().toLowerCase().email("Enter a valid email address."),
+  phone: z
+    .string()
+    .trim()
+    .min(7, "Enter a valid phone number.")
+    .max(20)
+    .optional()
+    .or(z.literal("")),
+  password: z.string().min(12, "Use at least 12 characters."),
+});
+export type RegisterEmployerInput = z.infer<typeof registerEmployerSchema>;
+
+export const employerSignInSchema = z.object({
+  email: z.string().trim().toLowerCase().email("Enter a valid email address."),
+  password: z.string().min(1, "Enter your password."),
+});
+export type EmployerSignInInput = z.infer<typeof employerSignInSchema>;
+
+/** The employer portal's source of truth on load — who is signed in, at which company. */
+export const employerSessionSchema = z.object({
+  authenticated: z.boolean(),
+  id: z.string().nullable(),
+  fullName: z.string().nullable(),
+  email: z.string().nullable(),
+  role: z.enum(EMPLOYER_TEAM_ROLES).nullable(),
+  employerId: z.string().nullable(),
+  employerName: z.string().nullable(),
+  employerStatus: z.enum(EMPLOYER_STATUSES).nullable(),
+});
+export type EmployerSessionView = z.infer<typeof employerSessionSchema>;
+
+export const employerProfileSchema = z.object({
+  id: z.string(),
+  registeredName: z.string(),
+  tradingName: z.string().nullable(),
+  cacNumber: z.string().nullable(),
+  companyType: z.string().nullable(),
+  tin: z.string().nullable(),
+  registeredAddress: z.string().nullable(),
+  operationalAddress: z.string().nullable(),
+  website: z.string().nullable(),
+  industry: z.string().nullable(),
+  employeeCount: z.number().nullable(),
+  status: z.enum(EMPLOYER_STATUSES),
+  createdAt: z.string(),
+});
+export type EmployerProfileView = z.infer<typeof employerProfileSchema>;
+
+/** Every field optional: a company fills this in over more than one visit. */
+export const updateEmployerProfileSchema = z.object({
+  tradingName: z.string().trim().max(200).optional().or(z.literal("")),
+  cacNumber: z.string().trim().max(50).optional().or(z.literal("")),
+  companyType: z.string().trim().max(100).optional().or(z.literal("")),
+  tin: z.string().trim().max(50).optional().or(z.literal("")),
+  registeredAddress: z.string().trim().max(500).optional().or(z.literal("")),
+  operationalAddress: z.string().trim().max(500).optional().or(z.literal("")),
+  website: z.string().trim().max(300).optional().or(z.literal("")),
+  industry: z.string().trim().max(100).optional().or(z.literal("")),
+  employeeCount: z.number().int().min(0).max(1_000_000).optional(),
+});
+export type UpdateEmployerProfileInput = z.infer<typeof updateEmployerProfileSchema>;
+
+export const employerTeamMemberSchema = z.object({
+  id: z.string(),
+  fullName: z.string(),
+  email: z.string(),
+  role: z.enum(EMPLOYER_TEAM_ROLES),
+  status: z.enum(["invited", "active", "suspended"]),
+  invitedAt: z.string(),
+  acceptedAt: z.string().nullable(),
+  lastLoginAt: z.string().nullable(),
+});
+export type EmployerTeamMemberView = z.infer<typeof employerTeamMemberSchema>;
+
+export const inviteEmployerTeamMemberSchema = z.object({
+  email: z.string().trim().toLowerCase().email("Enter a valid email address."),
+  fullName: z.string().trim().min(2, "Enter their full name.").max(200),
+  role: z.enum(["employer_contributor", "employer_viewer"]),
+});
+export type InviteEmployerTeamMemberInput = z.infer<typeof inviteEmployerTeamMemberSchema>;
+
+export const acceptEmployerInviteSchema = z.object({
+  token: z.string().min(1, "This invitation link is incomplete."),
+  password: z.string().min(12, "Use at least 12 characters."),
+});
+export type AcceptEmployerInviteInput = z.infer<typeof acceptEmployerInviteSchema>;
+
+/* ==========================================================================
  *  PRIVATE DEMONSTRATION — invitation codes
  * ========================================================================== */
 
@@ -1155,6 +1277,25 @@ export const kycCaseSchema = z.object({
 });
 export type KycCaseView = z.infer<typeof kycCaseSchema>;
 
+/**
+ * One row in the reviewer's queue. Deliberately thinner than `kycCaseSchema` —
+ * no decrypted identity fields here, because listing a hundred cases must not
+ * mean decrypting a hundred people's identity data just to render a queue.
+ * Decryption happens once, on `kycCaseSchema`, when a reviewer opens ONE case.
+ */
+export const kycQueueItemSchema = z.object({
+  userId: z.string(),
+  fullName: z.string(),
+  email: z.string(),
+  accountType: z.enum(ACCOUNT_TYPES),
+  status: z.enum(KYC_STATUSES),
+  submittedAt: z.string().nullable(),
+  idType: z.enum(ID_TYPES).nullable(),
+  documentCount: z.number(),
+  missingDocuments: z.array(z.enum(KYC_DOC_TYPES)),
+});
+export type KycQueueItemView = z.infer<typeof kycQueueItemSchema>;
+
 export const adminUserListItemSchema = z.object({
   id: z.string(),
   fullName: z.string(),
@@ -1240,6 +1381,19 @@ export const AUDIT_ACTIONS = [
   "user.suspended",
   "user.reinstated",
 
+  // Employer accounts — company onboarding and the team that manages it
+  "employer.registered",
+  "employer.login",
+  "employer.login.failed",
+  "employer.login.locked",
+  "employer.logout",
+  "employer.profile.updated",
+  "employer.team.invited",
+  "employer.team.invite_accepted",
+  "employer.team.role_changed",
+  "employer.team.suspended",
+  "employer.team.reinstated",
+
   // KYC
   "kyc.submitted",
   "kyc.resubmitted",
@@ -1295,6 +1449,7 @@ export const AUDIT_OUTCOME_LABELS: Record<AuditOutcome, string> = {
 export const AUDIT_ACTION_GROUPS = [
   { key: "admin", label: "Administrators", prefix: "admin." },
   { key: "user", label: "Customer accounts", prefix: "user." },
+  { key: "employer", label: "Employer accounts", prefix: "employer." },
   { key: "kyc", label: "KYC", prefix: "kyc." },
   { key: "invitation", label: "Demo invitations", prefix: "invitation." },
   { key: "support", label: "Support", prefix: "support." },

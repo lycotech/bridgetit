@@ -1,4 +1,5 @@
-import { S3Client, PutObjectCommand, DeleteObjectsCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectsCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 /**
  * KYC document object storage.
@@ -47,6 +48,22 @@ export async function putKycObject(key: string, bytes: Uint8Array, contentType: 
       CacheControl: "no-store",
     }),
   );
+}
+
+/**
+ * A short-lived, single-purpose URL to view one document's bytes directly from
+ * the bucket — never proxied through our own process, and never a link that
+ * outlives the reviewer's screen.
+ *
+ * WHY presigned rather than a permanent public URL: the bucket holds identity
+ * documents. A URL that works forever, once it leaks into a browser history, a
+ * proxy log or a support screenshot, is a permanent hole. A signature that
+ * expires in minutes closes itself.
+ */
+export async function getKycObjectViewUrl(key: string, expiresInSeconds = 300): Promise<string> {
+  return getSignedUrl(s3(), new GetObjectCommand({ Bucket: bucket(), Key: key }), {
+    expiresIn: expiresInSeconds,
+  });
 }
 
 /**

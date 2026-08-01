@@ -58,6 +58,8 @@ export interface RecordInput {
     | "invitation"
     | "kyc"
     | "registration"
+    | "employer"
+    | "employer_user"
     | "session"
     /** A support ticket, identified by its readable reference. */
     | "ticket"
