@@ -913,6 +913,362 @@ export const acceptEmployerInviteSchema = z.object({
 export type AcceptEmployerInviteInput = z.infer<typeof acceptEmployerInviteSchema>;
 
 /* ==========================================================================
+ *  PAYROLL — manual/CSV ingestion against PayrollCycle / PayrollRecord
+ *
+ *  Deliberately NOT computing `timeliness`, delay days or anything else the
+ *  risk engine derives (see eir/risk/payroll.ts) — that is a separate,
+ *  already-built, already-tested module. This is only the ingestion path: get
+ *  real payroll data into the tables that module reads.
+ * ========================================================================== */
+
+export const createPayrollCycleSchema = z.object({
+  /** First day of the pay period, e.g. "2026-07-01". */
+  periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD."),
+  expectedPayDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD."),
+});
+export type CreatePayrollCycleInput = z.infer<typeof createPayrollCycleSchema>;
+
+export const payrollRecordSchema = z.object({
+  id: z.string(),
+  staffRef: z.string().nullable(),
+  fullName: z.string().nullable(),
+  grossPay: z.number(),
+  netPay: z.number().nullable(),
+  deductions: z.number().nullable(),
+  allowances: z.number().nullable(),
+  bonus: z.number().nullable(),
+  paymentStatus: z.string(),
+  paidAt: z.string().nullable(),
+});
+export type PayrollRecordView = z.infer<typeof payrollRecordSchema>;
+
+export const payrollCycleSchema = z.object({
+  id: z.string(),
+  periodStart: z.string(),
+  expectedPayDate: z.string(),
+  actualPayDate: z.string().nullable(),
+  totalAmount: z.number().nullable(),
+  employeeCount: z.number().nullable(),
+  timeliness: z.string(),
+  source: z.string(),
+  createdAt: z.string(),
+});
+export type PayrollCycleView = z.infer<typeof payrollCycleSchema>;
+
+export const payrollCycleDetailSchema = payrollCycleSchema.extend({
+  records: z.array(payrollRecordSchema),
+});
+export type PayrollCycleDetailView = z.infer<typeof payrollCycleDetailSchema>;
+
+export const employeeRecordSchema = z.object({
+  id: z.string(),
+  staffRef: z.string(),
+  fullName: z.string().nullable(),
+  department: z.string().nullable(),
+  jobTitle: z.string().nullable(),
+  status: z.string(),
+  ewaEnrolled: z.boolean(),
+  /** Whether a real customer account has claimed this payroll row. */
+  linked: z.boolean(),
+});
+export type EmployeeRecordView = z.infer<typeof employeeRecordSchema>;
+
+export const inviteEmployeeLinkSchema = z.object({
+  email: z.string().trim().toLowerCase().email("Enter a valid email address."),
+});
+export type InviteEmployeeLinkInput = z.infer<typeof inviteEmployeeLinkSchema>;
+
+export const acceptEmployeeLinkSchema = z.object({
+  token: z.string().min(1, "This invitation link is incomplete."),
+});
+export type AcceptEmployeeLinkInput = z.infer<typeof acceptEmployeeLinkSchema>;
+
+/* ==========================================================================
+ *  ELIGIBILITY — the precondition checklist from PRD.md's Business Rules
+ *
+ *  Deliberately does NOT decide whether a requested Bridge amount is
+ *  approved — that needs a Bridge/draw model that does not exist yet (see
+ *  AGENTS.md, "Bridge Engine"). This is the checklist that engine will call
+ *  before it does anything else, plus an honest earned-to-date estimate.
+ * ========================================================================== */
+
+export const eligibilitySchema = z.object({
+  eligible: z.boolean(),
+  employmentVerified: z.boolean(),
+  employerActive: z.boolean(),
+  employerStatus: z.string().nullable(),
+  employerName: z.string().nullable(),
+  payrollVerified: z.boolean(),
+  kycApproved: z.boolean(),
+  /** Best-effort proration of the most recent linked pay record. Null until payroll is verified. */
+  earnedWageEstimate: z.number().nullable(),
+  currentPeriodStart: z.string().nullable(),
+  /** Human-readable blockers, empty when `eligible` is true. */
+  reasons: z.array(z.string()),
+});
+export type EligibilityView = z.infer<typeof eligibilitySchema>;
+
+/* ==========================================================================
+ *  BRIDGE — the earned-wage-access draw-request engine
+ *
+ *  "Treasury approves funding" from PRD.md's business flow is, in this
+ *  system, a deterministic real-time check against the `ewa` CreditLimit a
+ *  human already approved in the credit-risk decision (see routes/
+ *  admin-risk.ts) — not a second manual review per draw. See routes/
+ *  bridge.ts for the full reasoning.
+ * ========================================================================== */
+
+export const requestBridgeDrawSchema = z.object({
+  amount: z.number().positive("Enter an amount greater than zero."),
+});
+export type RequestBridgeDrawInput = z.infer<typeof requestBridgeDrawSchema>;
+
+export const bridgeDrawSchema = z.object({
+  id: z.string(),
+  reference: z.string(),
+  requestedAmount: z.number(),
+  approvedAmount: z.number().nullable(),
+  status: z.enum(["requested", "approved", "rejected"]),
+  rejectionReason: z.string().nullable(),
+  requestedAt: z.string(),
+  decidedAt: z.string().nullable(),
+});
+export type BridgeDrawView = z.infer<typeof bridgeDrawSchema>;
+
+/* ==========================================================================
+ *  SAVINGS — a self-service ledger (backend/prisma/schema.prisma's
+ *  SavingsGoal/SavingsTransaction). No bank rail exists yet — a deposit or
+ *  withdrawal here is a self-reported bookkeeping entry, not money PayBridge
+ *  actually moved. Same honesty limitation as an unfinalised Bridge draw.
+ * ========================================================================== */
+
+export const createSavingsGoalSchema = z.object({
+  label: z.string().trim().min(2, "Give this goal a name.").max(120),
+  targetAmount: z.number().positive().optional(),
+  targetDate: z.string().optional(),
+});
+export type CreateSavingsGoalInput = z.infer<typeof createSavingsGoalSchema>;
+
+export const savingsTransactionInputSchema = z.object({
+  amount: z.number().positive("Enter an amount greater than zero."),
+  note: z.string().trim().max(300).optional().or(z.literal("")),
+});
+export type SavingsTransactionInput = z.infer<typeof savingsTransactionInputSchema>;
+
+export const savingsTransactionSchema = z.object({
+  id: z.string(),
+  type: z.enum(["deposit", "withdrawal"]),
+  amount: z.number(),
+  note: z.string().nullable(),
+  balanceAfter: z.number(),
+  createdAt: z.string(),
+});
+export type SavingsTransactionView = z.infer<typeof savingsTransactionSchema>;
+
+export const savingsGoalSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  targetAmount: z.number().nullable(),
+  targetDate: z.string().nullable(),
+  balance: z.number(),
+  status: z.enum(["active", "closed"]),
+  createdAt: z.string(),
+});
+export type SavingsGoalView = z.infer<typeof savingsGoalSchema>;
+
+/* ==========================================================================
+ *  INVESTMENTS — a capital-commitment ledger for capital-partner accounts.
+ *  Same honesty limitation as Savings: a commitment is recorded, not
+ *  transferred. `PortfolioSnapshotView` reports REAL portfolio statistics —
+ *  never a fabricated return figure; there is no yield model in this
+ *  codebase to report from. See backend/src/routes/investments.ts.
+ * ========================================================================== */
+
+export const createInvestmentCommitmentSchema = z.object({
+  amount: z.number().positive("Enter an amount greater than zero."),
+  note: z.string().trim().max(300).optional().or(z.literal("")),
+});
+export type CreateInvestmentCommitmentInput = z.infer<typeof createInvestmentCommitmentSchema>;
+
+export const investmentCommitmentSchema = z.object({
+  id: z.string(),
+  amount: z.number(),
+  status: z.enum(["committed", "withdrawn"]),
+  note: z.string().nullable(),
+  committedAt: z.string(),
+  withdrawnAt: z.string().nullable(),
+});
+export type InvestmentCommitmentView = z.infer<typeof investmentCommitmentSchema>;
+
+export const portfolioSnapshotSchema = z.object({
+  totalEmployers: z.number(),
+  activeEmployers: z.number(),
+  tierDistribution: z.array(z.object({ tier: z.string(), count: z.number() })),
+  totalApprovedExposure: z.number(),
+  totalAvailableExposure: z.number(),
+  bridgeDrawsApprovedCount: z.number(),
+  bridgeDrawsApprovedVolume: z.number(),
+  totalPayrollProcessed: z.number(),
+  totalCommittedCapital: z.number(),
+  yourCommittedCapital: z.number(),
+  asOf: z.string(),
+});
+export type PortfolioSnapshotView = z.infer<typeof portfolioSnapshotSchema>;
+
+/* ==========================================================================
+ *  CREDIT RISK — the eir/risk engine, wired for the first time
+ *
+ *  A trimmed, JSON-safe view over eir/risk/score.ts's ScoreResult (the full
+ *  internal shape is much larger — per-check/per-signal detail arrays with
+ *  no dedicated storage; see eir/persist-score.ts). This is what the admin
+ *  portal actually renders.
+ * ========================================================================== */
+
+export const riskEmployerListItemSchema = z.object({
+  id: z.string(),
+  registeredName: z.string(),
+  status: z.string(),
+  industry: z.string().nullable(),
+  employeeCount: z.number().nullable(),
+  currentScore: z.number().nullable(),
+  currentTier: z.string().nullable(),
+  earlyWarningLevel: z.string(),
+  createdAt: z.string(),
+});
+export type RiskEmployerListItem = z.infer<typeof riskEmployerListItemSchema>;
+
+export const riskComponentSchema = z.object({
+  component: z.string(),
+  label: z.string(),
+  rawScore: z.number(),
+  weight: z.number(),
+  weightedScore: z.number(),
+  classification: z.string(),
+  dataInsufficient: z.boolean(),
+  explanation: z.string(),
+});
+export type RiskComponentView = z.infer<typeof riskComponentSchema>;
+
+export const riskKnockoutSchema = z.object({
+  ruleKey: z.string(),
+  label: z.string(),
+  triggered: z.boolean(),
+  consequence: z.string().nullable(),
+  overridable: z.boolean(),
+  description: z.string(),
+  evidence: z.string(),
+});
+export type RiskKnockoutView = z.infer<typeof riskKnockoutSchema>;
+
+export const riskLimitProductSchema = z.object({
+  product: z.string(),
+  offered: z.boolean(),
+  recommendedLimit: z.number().nullable(),
+  displayLimit: z.string(),
+  reason: z.string(),
+});
+export type RiskLimitProductView = z.infer<typeof riskLimitProductSchema>;
+
+export const riskScoreSchema = z.object({
+  scoreId: z.string(),
+  employerId: z.string(),
+  policyVersion: z.string(),
+  totalScore: z.number(),
+  tier: z.string(),
+  tierLabel: z.string(),
+  classification: z.string(),
+  components: z.array(riskComponentSchema),
+  knockouts: z.object({
+    evaluations: z.array(riskKnockoutSchema),
+    triggeredCount: z.number(),
+    blocked: z.boolean(),
+    declineMandated: z.boolean(),
+    committeeReferralRequired: z.boolean(),
+    enhancedDueDiligenceRequired: z.boolean(),
+    worstConsequence: z.string().nullable(),
+    reasons: z.array(z.string()),
+  }),
+  limits: z.object({
+    totalRecommendedExposure: z.number().nullable(),
+    displayTotal: z.string(),
+    products: z.array(riskLimitProductSchema),
+    noLimitReason: z.string().nullable(),
+    conditions: z.array(z.string()),
+  }),
+  decisionPermitted: z.boolean(),
+  recommendedRoute: z.string(),
+  dataCompleteness: z.object({
+    payrollMonths: z.number(),
+    financialMonths: z.number(),
+    percent: z.number(),
+    sufficientForDecision: z.boolean(),
+  }),
+  keyStrengths: z.array(z.string()),
+  keyConcerns: z.array(z.string()),
+  outstandingItems: z.array(z.string()),
+  explanation: z.string(),
+  calculatedAt: z.string(),
+});
+export type RiskScoreView = z.infer<typeof riskScoreSchema>;
+
+export const recordCreditDecisionSchema = z.object({
+  decision: z.enum(["approve", "decline"]),
+  reason: z.string().trim().min(4, "Give a reason.").max(1000),
+});
+export type RecordCreditDecisionInput = z.infer<typeof recordCreditDecisionSchema>;
+
+export const creditDecisionSchema = z.object({
+  id: z.string(),
+  employerId: z.string(),
+  decision: z.string(),
+  reason: z.string(),
+  decidedByLabel: z.string(),
+  authorityLevel: z.string(),
+  secondedByLabel: z.string().nullable(),
+  recommendedTier: z.string().nullable(),
+  recommendedLimit: z.number().nullable(),
+  approvedLimit: z.number().nullable(),
+  decidedAt: z.string(),
+  /** True once every authority requirement (incl. a second approver) is met and the decision has taken effect. */
+  finalised: z.boolean(),
+});
+export type CreditDecisionView = z.infer<typeof creditDecisionSchema>;
+
+export const authorityDecisionSchema = z.object({
+  requiredLevel: z.string().nullable(),
+  requiredLevelLabel: z.string(),
+  dualApprovalRequired: z.boolean(),
+  dualApprovalReasons: z.array(z.string()),
+  exceedsAllAuthorities: z.boolean(),
+  explanation: z.string(),
+});
+export type AuthorityDecisionView = z.infer<typeof authorityDecisionSchema>;
+
+/* ==========================================================================
+ *  REPORTING — real aggregates over data the product now actually has
+ * ========================================================================== */
+
+export const adminReportsOverviewSchema = z.object({
+  employersByStatus: z.array(z.object({ status: z.string(), count: z.number() })),
+  employersByTier: z.array(z.object({ tier: z.string(), count: z.number() })),
+  kycFunnel: z.array(z.object({ status: z.string(), count: z.number() })),
+  totalApprovedExposure: z.number(),
+  totalAvailableExposure: z.number(),
+  payrollCyclesProcessed: z.number(),
+  totalPayrollProcessed: z.number(),
+  bridgeDraws: z.object({
+    requested: z.number(),
+    approved: z.number(),
+    rejected: z.number(),
+    approvedVolume: z.number(),
+  }),
+  savingsTotalBalance: z.number(),
+  investmentsTotalCommitted: z.number(),
+  asOf: z.string(),
+});
+export type AdminReportsOverviewView = z.infer<typeof adminReportsOverviewSchema>;
+
+/* ==========================================================================
  *  PRIVATE DEMONSTRATION — invitation codes
  * ========================================================================== */
 
@@ -1393,6 +1749,22 @@ export const AUDIT_ACTIONS = [
   "employer.team.role_changed",
   "employer.team.suspended",
   "employer.team.reinstated",
+  "employer.payroll.cycle_created",
+  "employer.payroll.uploaded",
+  "employee.link.invited",
+  "employee.link.accepted",
+  "risk.score.calculated",
+  "risk.decision.recorded",
+  "risk.decision.seconded",
+  "bridge.draw.requested",
+  "bridge.draw.approved",
+  "bridge.draw.rejected",
+  "savings.goal.created",
+  "savings.deposit.recorded",
+  "savings.withdrawal.recorded",
+  "investment.commitment.recorded",
+  "investment.commitment.withdrawn",
+  "reports.viewed",
 
   // KYC
   "kyc.submitted",

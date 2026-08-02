@@ -22,6 +22,8 @@ import PortalOverview from "./pages/admin/portal/PortalOverview";
 import RegisteredUsers from "./pages/admin/portal/RegisteredUsers";
 import KycReview from "./pages/admin/portal/KycReview";
 import Employers from "./pages/admin/portal/Employers";
+import CreditRisk from "./pages/admin/portal/CreditRisk";
+import AdminReports from "./pages/admin/portal/Reports";
 import DemoInvitations from "./pages/admin/portal/DemoInvitations";
 import SupportRequests from "./pages/admin/portal/SupportRequests";
 import AdminUsers from "./pages/admin/portal/AdminUsers";
@@ -43,11 +45,13 @@ import CustomerSignIn from "./pages/account/SignIn";
 import VerifyEmail from "./pages/account/VerifyEmail";
 import VerifyIdentity from "./pages/account/VerifyIdentity";
 import AccountHome from "./pages/account/AccountHome";
+import LinkEmployer from "./pages/account/LinkEmployer";
 import { RequireGate, RedirectIfSignedIn as RedirectIfCustomerSignedIn } from "@/components/account/AccountGate";
 import EmployerPortalRegister from "./pages/employer-portal/Register";
 import EmployerPortalLogin from "./pages/employer-portal/Login";
 import EmployerPortalHome from "./pages/employer-portal/Home";
 import EmployerPortalAcceptInvite from "./pages/employer-portal/AcceptInvite";
+import EmployerPortalPayroll from "./pages/employer-portal/Payroll";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import Verify from "./pages/auth/Verify";
 import SelectRole from "./pages/auth/SelectRole";
@@ -183,6 +187,11 @@ const App = () => (
                 </RequireGate>
               }
             />
+            {/* Reached from the "you've been added to payroll" email. Handles
+                its own auth state (anonymous vs signed in) rather than being
+                wrapped in RequireGate, since it must work for someone who is
+                not signed in yet. */}
+            <Route path="/link-employer" element={<LinkEmployer />} />
 
             {/* ----------------------------------------------------------------
                 EMPLOYER PORTAL — a company's own multi-seat login.
@@ -196,6 +205,7 @@ const App = () => (
             <Route path="/employer-portal/login" element={<EmployerPortalLogin />} />
             <Route path="/employer-portal/accept-invite" element={<EmployerPortalAcceptInvite />} />
             <Route path="/employer-portal" element={<EmployerPortalHome />} />
+            <Route path="/employer-portal/payroll" element={<EmployerPortalPayroll />} />
 
             {/* The gate in front of the private demonstration environment. */}
             <Route path="/private-demo" element={<PrivateDemo />} />
@@ -222,6 +232,8 @@ const App = () => (
               <Route path="users" element={<RegisteredUsers />} />
               <Route path="kyc" element={<KycReview />} />
               <Route path="employers" element={<Employers />} />
+              <Route path="risk" element={<CreditRisk />} />
+              <Route path="reports" element={<AdminReports />} />
               <Route path="invitations" element={<DemoInvitations />} />
               <Route path="support" element={<SupportRequests />} />
               <Route path="admins" element={<AdminUsers />} />

@@ -10,6 +10,11 @@ import { waitlistRouter } from "./routes/waitlist";
 import { registrationsRouter } from "./routes/registrations";
 import { authRouter } from "./routes/auth";
 import { employerRouter } from "./routes/employer";
+import { payrollRouter } from "./routes/employer-payroll";
+import { employeeLinkRouter } from "./routes/employee-link";
+import { bridgeRouter } from "./routes/bridge";
+import { savingsRouter } from "./routes/savings";
+import { investmentsRouter } from "./routes/investments";
 import { adminRouter } from "./routes/admin";
 import { adminAuthRouter } from "./routes/admin-auth";
 import { invitationsRouter } from "./routes/admin-invitations";
@@ -17,6 +22,8 @@ import { auditRouter } from "./routes/admin-audit";
 import { adminUsersRouter } from "./routes/admin-users";
 import { supportAdminRouter } from "./routes/admin-support";
 import { adminKycRouter } from "./routes/admin-kyc";
+import { adminRiskRouter } from "./routes/admin-risk";
+import { adminReportsRouter } from "./routes/admin-reports";
 import { preferencesRouter } from "./routes/preferences";
 import { consentsRouter } from "./routes/consents";
 import { supportRouter } from "./routes/support";
@@ -140,8 +147,19 @@ app.route("/api/registrations", registrationsRouter);
 // This is the only one of the three access routes that belongs in the main
 // navigation. It cannot reach the admin portal or the private demonstration.
 app.route("/api/auth", authRouter);
+// The customer side of linking a real account to a payroll roster row, plus
+// the eligibility checklist that depends on it. Same session as /api/auth.
+app.route("/api/auth", employeeLinkRouter);
+// The earned-wage-access draw request. Same customer session as /api/auth.
+app.route("/api/bridge", bridgeRouter);
+// Self-service ledgers — same customer session as /api/auth. See
+// routes/savings.ts and routes/investments.ts for the honesty limitation
+// both share (no bank rail exists yet).
+app.route("/api/savings", savingsRouter);
+app.route("/api/investments", investmentsRouter);
 // A company's own multi-seat login — separate session, separate cookie, from
 // the individual customer accounts above. See routes/employer.ts.
+app.route("/api/employer/payroll", payrollRouter);
 app.route("/api/employer", employerRouter);
 // Session-gated: how PayBridge should behave for one person. Functional
 // preferences only, keyed by the session's own user id, with no employer-facing
@@ -178,6 +196,10 @@ app.route("/api/admin/support", supportAdminRouter);
 // And ahead of /api/admin: KYC review. Decrypted identity fields are returned
 // only from this router, one case at a time, each read logged.
 app.route("/api/admin/kyc", adminKycRouter);
+// And ahead of /api/admin: credit risk. Wires eir/risk/* to a real route for
+// the first time — see admin-risk.ts's header for what is and isn't covered.
+app.route("/api/admin/risk", adminRiskRouter);
+app.route("/api/admin/reports", adminReportsRouter);
 app.route("/api/admin", adminRouter);
 app.route("/api/demo", demoRouter);
 

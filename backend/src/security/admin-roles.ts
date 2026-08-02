@@ -68,9 +68,25 @@ export type AdminPermission =
    * SupportAccessLog whether it is permitted or not.
    */
   | "support.accessibility.view"
+  /** Read an employer's credit score, knockouts and limit recommendations. */
+  | "risk.view"
+  /** Read portfolio-wide aggregates — no individual customer detail. */
+  | "reports.view"
   /* --- Acting --- */
   /** Approve or reject a KYC submission. The regulated decision. */
   | "kyc.decide"
+  /**
+   * Record a credit decision (approve/decline) against an employer's score.
+   *
+   * Separate from `risk.view` for the same reason `kyc.decide` is separate
+   * from `kyc.view`: seeing a recommendation and having the authority to act
+   * on it are different questions. The engine's own authority matrix
+   * (eir/risk/limits.ts resolveAuthority) is a second, independent gate on
+   * top of this permission — holding `risk.decide` opens the endpoint;
+   * whether THIS decision is within this administrator's exposure authority
+   * is checked separately, per decision.
+   */
+  | "risk.decide"
   /** Suspend or reinstate a customer account. */
   | "users.suspend"
   /** Edit an employer record. */
@@ -130,6 +146,9 @@ const ADMIN_ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[]> = {
     "security.view",
     "support.view",
     "support.accessibility.view",
+    "risk.view",
+    "risk.decide",
+    "reports.view",
     "kyc.decide",
     "users.suspend",
     "employers.manage",
@@ -150,6 +169,10 @@ const ADMIN_ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[]> = {
     // where a customer is stuck in order to help them, and must not be the one
     // who clears them.
     "kyc.view",
+    // Same split for credit risk: can see a score and its knockouts, cannot
+    // record the decision. Underwriting authority is not an operations job.
+    "risk.view",
+    "reports.view",
     // Support is operations' job: read the request, read how to reach the person
     // well, answer it. Escalating someone as vulnerable is NOT here — that goes
     // to a Super Admin, because it is a judgement about a person rather than a
@@ -171,6 +194,8 @@ const ADMIN_ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[]> = {
     // auditor checking that cases were handled properly does not need the list
     // of who needs bigger writing.
     "support.view",
+    "risk.view",
+    "reports.view",
   ],
 };
 
@@ -208,6 +233,8 @@ export const PORTAL_SECTIONS = [
   { key: "users", label: "Registered users", permission: "users.view" },
   { key: "kyc", label: "KYC review", permission: "kyc.view" },
   { key: "employers", label: "Employers", permission: "employers.view" },
+  { key: "risk", label: "Credit risk", permission: "risk.view" },
+  { key: "reports", label: "Reports", permission: "reports.view" },
   { key: "invitations", label: "Demo invitations", permission: "invitations.view" },
   { key: "support", label: "Support requests", permission: "support.view" },
   { key: "admins", label: "Admin users", permission: "admins.view" },

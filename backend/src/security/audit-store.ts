@@ -60,6 +60,13 @@ export interface RecordInput {
     | "registration"
     | "employer"
     | "employer_user"
+    | "payroll_cycle"
+    | "employee_record"
+    | "employer_score"
+    | "credit_decision"
+    | "bridge_draw"
+    | "savings_goal"
+    | "investment_commitment"
     | "session"
     /** A support ticket, identified by its readable reference. */
     | "ticket"

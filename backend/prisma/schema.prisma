@@ -359,6 +359,17 @@ model User {
   preferences       UserPreference?
   supportTickets    SupportTicket[]
   consents          UserConsent[]
+  /// The employer's payroll-roster row this account has been linked to, if
+  /// any. Null until the employee accepts a link invitation (or a future
+  /// self-service match) — see routes/employee-link.ts. Nullable and
+  /// one-to-one: most `User` rows are never linked to payroll at all (e.g.
+  /// investor/employer accounts), and a roster row can be claimed by at most
+  /// one account.
+  employeeRecord    EmployeeRecord?
+  bridgeDraws       BridgeDraw[]
+  savingsGoals        SavingsGoal[]
+  savingsTransactions SavingsTransaction[]
+  investmentCommitments InvestmentCommitment[]
 
   @@index([status])
   @@index([kycStatus])
@@ -713,6 +724,7 @@ model Employer {
   decisions            CreditDecision[]
   limits               CreditLimit[]
   utilisations         Utilisation[]
+  bridgeDraws          BridgeDraw[]
   repayments           Repayment[]
   covenants            Covenant[]
   monitoringReviews    MonitoringReview[]
@@ -1184,7 +1196,8 @@ model PayrollCycle {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  records PayrollRecord[]
+  records     PayrollRecord[]
+  bridgeDraws BridgeDraw[]
 
   @@unique([employerId, periodStart])
   @@index([employerId, expectedPayDate])
@@ -1222,7 +1235,8 @@ model PayrollRecord {
   @@index([employeeId])
 }
 
-/// An employee of the employer, for headcount and tenure analysis only.
+/// An employee of the employer — headcount/tenure, AND (once linked) the
+/// payroll identity behind a real customer `User` account's eligibility.
 model EmployeeRecord {
   id         String   @id @default(cuid())
   employerId String
@@ -1243,11 +1257,21 @@ model EmployeeRecord {
   /// usage: per-employee usage is deliberately not modelled here.
   ewaEnrolled  Boolean   @default(false)
 
+  /// The real customer account this payroll row belongs to, once claimed via
+  /// an employer-issued invitation (routes/employee-link.ts). Null means
+  /// "uploaded in payroll, nobody has linked a login to it yet" — the normal
+  /// state for a freshly-uploaded roster row. `onDelete: SetNull`: if the
+  /// customer account is ever deleted, the payroll history stays (it belongs
+  /// to the employer), it simply becomes unlinked again.
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   payrollRecords PayrollRecord[]
+  bridgeDraws    BridgeDraw[]
 
   @@unique([employerId, staffRef])
   @@index([employerId, status])
@@ -1787,6 +1811,7 @@ model CreditLimit {
   updatedAt DateTime @updatedAt
 
   utilisations Utilisation[]
+  bridgeDraws  BridgeDraw[]
   repayments   Repayment[]
   covenants    Covenant[]
 
@@ -1823,6 +1848,59 @@ model Utilisation {
 
   @@index([employerId, drawnAt])
   @@index([limitId, status])
+}
+
+/// One employee's individual earned-wage-access request against their
+/// employer's `ewa` CreditLimit — the Bridge Engine.
+///
+/// EMPLOYEE PRIVACY, same rule as `Utilisation` above: this row is never
+/// exposed through any employer-facing route. Only the employee themselves
+/// and PayBridge staff can read it; the employer only ever sees the
+/// aggregate `Utilisation` row this draw rolls up into.
+///
+/// Deliberately does not model actual money movement — `status` stops at
+/// `approved`/`rejected` here. Disbursement and payroll-deduction repayment
+/// are a separate, not-yet-built piece (see AGENTS.md, "Disbursement").
+model BridgeDraw {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  employeeRecordId String
+  employeeRecord   EmployeeRecord @relation(fields: [employeeRecordId], references: [id], onDelete: Cascade)
+
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  limitId String
+  limit   CreditLimit @relation(fields: [limitId], references: [id], onDelete: Cascade)
+
+  cycleId String?
+  cycle   PayrollCycle? @relation(fields: [cycleId], references: [id], onDelete: SetNull)
+
+  /// Human reference shown to the employee, e.g. BRG-2026-000123.
+  reference       String   @unique
+  requestedAmount Decimal  @db.Decimal(18, 2)
+  /// Equal to requestedAmount when approved in full; null when rejected.
+  approvedAmount  Decimal? @db.Decimal(18, 2)
+
+  /// requested | approved | rejected
+  status          String  @default("requested")
+  rejectionReason String?
+
+  requestedAt    DateTime  @default(now())
+  decidedAt      DateTime?
+  /// "system" for the deterministic auto-decision, or a staff id.
+  decidedBy      String?
+  decidedByLabel String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([employerId, status])
+  @@index([limitId])
 }
 
 /// A repayment. Feeds behavioural trust deterministically.
@@ -2215,4 +2293,88 @@ model SupportAccessLog {
   @@index([adminId, createdAt])
   @@index([subjectUserId, createdAt])
   @@index([resource, createdAt])
+}
+
+// ==========================================================================
+// SAVINGS — a self-service ledger, not a bank account
+//
+// No bank rail exists yet (see AGENTS.md, "Disbursement/Repayment"), so a
+// deposit/withdrawal here is a self-reported bookkeeping entry, the same
+// honesty limitation BridgeDraw has pre-disbursement: real numbers the
+// employee entered, not money PayBridge actually moved. `balanceAfter` on
+// each transaction makes the ledger self-auditable without recomputing a
+// running sum from the whole history on every read.
+// ==========================================================================
+
+model SavingsGoal {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  label        String
+  targetAmount Decimal? @db.Decimal(18, 2)
+  targetDate   DateTime?
+  balance      Decimal  @default(0) @db.Decimal(18, 2)
+  /// active | closed
+  status       String   @default("active")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions SavingsTransaction[]
+
+  @@index([userId, status])
+}
+
+model SavingsTransaction {
+  id     String      @id @default(cuid())
+  goalId String
+  goal   SavingsGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  userId String
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// deposit | withdrawal
+  type         String
+  amount       Decimal  @db.Decimal(18, 2)
+  note         String?
+  /// The goal's balance immediately after this entry — makes the ledger
+  /// self-auditable without replaying the whole history.
+  balanceAfter Decimal  @db.Decimal(18, 2)
+
+  createdAt DateTime @default(now())
+
+  @@index([goalId, createdAt])
+  @@index([userId, createdAt])
+}
+
+// ==========================================================================
+// INVESTMENTS — a capital-commitment ledger for capital-partner accounts
+//
+// Same honesty limitation as Savings: a commitment is recorded, not
+// transferred — no payment rail exists yet. The portfolio-snapshot route
+// (not a table) reports REAL portfolio statistics computed from
+// Employer/CreditLimit/BridgeDraw — an investor's capital is shown against
+// what it is actually funding, never a fabricated return figure. There is
+// no yield/interest-distribution model in this codebase; inventing one
+// would be a business decision this project should make deliberately, not
+// something to guess at while wiring a route.
+// ==========================================================================
+
+model InvestmentCommitment {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  amount Decimal @db.Decimal(18, 2)
+  /// committed | withdrawn
+  status String  @default("committed")
+  note   String?
+
+  committedAt DateTime  @default(now())
+  withdrawnAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
 }

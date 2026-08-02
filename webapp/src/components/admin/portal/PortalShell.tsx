@@ -1,8 +1,10 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
+  BarChart3,
   ClipboardCheck,
   Building2,
   FileClock,
+  Gauge,
   LayoutDashboard,
   LifeBuoy,
   LogOut,
@@ -36,6 +38,8 @@ const SECTIONS: { to: string; label: string; permission: string; icon: LucideIco
   { to: "/admin/users", label: "Registered users", permission: "users.view", icon: Users },
   { to: "/admin/kyc", label: "KYC review", permission: "kyc.view", icon: ClipboardCheck },
   { to: "/admin/employers", label: "Employers", permission: "employers.view", icon: Building2 },
+  { to: "/admin/risk", label: "Credit risk", permission: "risk.view", icon: Gauge },
+  { to: "/admin/reports", label: "Reports", permission: "reports.view", icon: BarChart3 },
   { to: "/admin/invitations", label: "Demo invitations", permission: "invitations.view", icon: Ticket },
   { to: "/admin/support", label: "Support requests", permission: "support.view", icon: LifeBuoy },
   { to: "/admin/admins", label: "Admin users", permission: "admins.view", icon: UserCog },

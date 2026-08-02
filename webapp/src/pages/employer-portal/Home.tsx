@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Loader2, LogOut, UserPlus } from "lucide-react";
+import { Loader2, LogOut, UserPlus, Wallet } from "lucide-react";
 import { PageHeader, ActionButton } from "@/components/dashboard/PageHeader";
 import { Panel, SummaryRow } from "@/components/dashboard/Panel";
 import { useEmployerSession, useEmployerLogout } from "@/lib/employer/session";
@@ -93,14 +93,19 @@ export default function EmployerPortalHome() {
         title={session.data.employerName ?? "Your company"}
         description={`Signed in as ${session.data.fullName} (${EMPLOYER_TEAM_ROLE_LABELS[session.data.role!]})`}
         actions={
-          <ActionButton
-            variant="ghost"
-            icon={<LogOut className="h-4 w-4" />}
-            onClick={() => logout.mutate()}
-            loading={logout.isPending}
-          >
-            Sign out
-          </ActionButton>
+          <>
+            <ActionButton variant="secondary" to="/employer-portal/payroll" icon={<Wallet className="h-4 w-4" />}>
+              Payroll
+            </ActionButton>
+            <ActionButton
+              variant="ghost"
+              icon={<LogOut className="h-4 w-4" />}
+              onClick={() => logout.mutate()}
+              loading={logout.isPending}
+            >
+              Sign out
+            </ActionButton>
+          </>
         }
       />
 

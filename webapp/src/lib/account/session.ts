@@ -1,11 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type {
+  AcceptEmployeeLinkInput,
+  BridgeDrawView,
   ChangeEmailInput,
   ConfirmVerificationInput,
+  CreateInvestmentCommitmentInput,
+  CreateSavingsGoalInput,
+  EligibilityView,
+  InvestmentCommitmentView,
   KycStatusView,
   KycSubmissionInput,
+  PortfolioSnapshotView,
   RegisterAccountInput,
+  RequestBridgeDrawInput,
+  SavingsGoalView,
+  SavingsTransactionInput,
+  SavingsTransactionView,
   SessionGate,
   SessionState,
   SignInInput,
@@ -162,6 +173,134 @@ export function useUploadKycDocument() {
       return json?.data as KycStatusView;
     },
     onSuccess: (data) => qc.setQueryData(KYC_KEY, data),
+  });
+}
+
+/** The eligibility checklist from PRD.md's Business Rules — see routes/employee-link.ts. */
+export function useEligibility(enabled: boolean) {
+  return useQuery({
+    queryKey: ["account", "eligibility"] as const,
+    queryFn: () => api.get<EligibilityView>("/api/auth/eligibility"),
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+export function useBridgeDraws(enabled: boolean) {
+  return useQuery({
+    queryKey: ["account", "bridge", "draws"] as const,
+    queryFn: () => api.get<{ items: BridgeDrawView[] }>("/api/bridge/draws"),
+    enabled,
+  });
+}
+
+export function useRequestBridgeDraw() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RequestBridgeDrawInput) => api.post<BridgeDrawView>("/api/bridge/request", input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["account", "bridge", "draws"] });
+      void qc.invalidateQueries({ queryKey: ["account", "eligibility"] });
+    },
+  });
+}
+
+/* ------------------------------------------------------------- SAVINGS */
+
+export function useSavingsGoals(enabled: boolean) {
+  return useQuery({
+    queryKey: ["account", "savings", "goals"] as const,
+    queryFn: () => api.get<{ items: SavingsGoalView[] }>("/api/savings/goals"),
+    enabled,
+  });
+}
+
+export function useCreateSavingsGoal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateSavingsGoalInput) => api.post<SavingsGoalView>("/api/savings/goals", input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["account", "savings", "goals"] }),
+  });
+}
+
+export function useSavingsTransactions(goalId: string | null) {
+  return useQuery({
+    queryKey: ["account", "savings", "transactions", goalId ?? ""] as const,
+    queryFn: () => api.get<{ items: SavingsTransactionView[] }>(`/api/savings/goals/${goalId}/transactions`),
+    enabled: Boolean(goalId),
+  });
+}
+
+export function useSavingsDeposit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ goalId, ...input }: SavingsTransactionInput & { goalId: string }) =>
+      api.post<SavingsTransactionView>(`/api/savings/goals/${goalId}/deposit`, input),
+    onSuccess: (_, variables) => {
+      void qc.invalidateQueries({ queryKey: ["account", "savings", "goals"] });
+      void qc.invalidateQueries({ queryKey: ["account", "savings", "transactions", variables.goalId] });
+    },
+  });
+}
+
+export function useSavingsWithdraw() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ goalId, ...input }: SavingsTransactionInput & { goalId: string }) =>
+      api.post<SavingsTransactionView>(`/api/savings/goals/${goalId}/withdraw`, input),
+    onSuccess: (_, variables) => {
+      void qc.invalidateQueries({ queryKey: ["account", "savings", "goals"] });
+      void qc.invalidateQueries({ queryKey: ["account", "savings", "transactions", variables.goalId] });
+    },
+  });
+}
+
+/* ---------------------------------------------------------- INVESTMENTS */
+
+export function useInvestmentCommitments(enabled: boolean) {
+  return useQuery({
+    queryKey: ["account", "investments", "commitments"] as const,
+    queryFn: () => api.get<{ items: InvestmentCommitmentView[] }>("/api/investments/commitments"),
+    enabled,
+  });
+}
+
+export function useCreateInvestmentCommitment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateInvestmentCommitmentInput) =>
+      api.post<InvestmentCommitmentView>("/api/investments/commitments", input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["account", "investments", "commitments"] });
+      void qc.invalidateQueries({ queryKey: ["account", "investments", "portfolio"] });
+    },
+  });
+}
+
+export function useWithdrawInvestmentCommitment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<InvestmentCommitmentView>(`/api/investments/commitments/${id}/withdraw`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["account", "investments", "commitments"] });
+      void qc.invalidateQueries({ queryKey: ["account", "investments", "portfolio"] });
+    },
+  });
+}
+
+export function usePortfolioSnapshot(enabled: boolean) {
+  return useQuery({
+    queryKey: ["account", "investments", "portfolio"] as const,
+    queryFn: () => api.get<PortfolioSnapshotView>("/api/investments/portfolio"),
+    enabled,
+  });
+}
+
+export function useLinkEmployer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AcceptEmployeeLinkInput) => api.post<{ linked: boolean }>("/api/auth/link", input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["account", "eligibility"] }),
   });
 }
 
