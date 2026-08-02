@@ -3,7 +3,14 @@ import { Navigate } from "react-router-dom";
 import { Loader2, LogOut, UserPlus, Wallet } from "lucide-react";
 import { PageHeader, ActionButton } from "@/components/dashboard/PageHeader";
 import { Panel, SummaryRow } from "@/components/dashboard/Panel";
-import { useEmployerSession, useEmployerLogout } from "@/lib/employer/session";
+import { TwoFactorPanel } from "@/components/account/TwoFactorPanel";
+import {
+  useDisableEmployerTwoFactor,
+  useEmployerSession,
+  useEmployerLogout,
+  useEnableEmployerTwoFactor,
+  useEnrolEmployerTwoFactor,
+} from "@/lib/employer/session";
 import {
   useEmployerProfile,
   useEmployerTeam,
@@ -32,6 +39,9 @@ export default function EmployerPortalHome() {
   const team = useEmployerTeam(isAdmin);
   const updateProfile = useUpdateEmployerProfile();
   const invite = useInviteEmployerTeamMember();
+  const enrol2fa = useEnrolEmployerTwoFactor();
+  const enable2fa = useEnableEmployerTwoFactor();
+  const disable2fa = useDisableEmployerTwoFactor();
 
   const [form, setForm] = useState<UpdateEmployerProfileInput>({});
   const [saved, setSaved] = useState(false);
@@ -185,6 +195,13 @@ export default function EmployerPortalHome() {
           </form>
         </Panel>
       ) : null}
+
+      <TwoFactorPanel
+        enabled={session.data.twoFactorEnabled}
+        enrol={enrol2fa}
+        enable={enable2fa}
+        disable={disable2fa}
+      />
     </div>
   );
 }

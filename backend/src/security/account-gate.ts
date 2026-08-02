@@ -38,6 +38,7 @@ export interface AccountRow {
   kycReviewedAt: Date | null;
   kycRejectionReason: string | null;
   suspendedReason: string | null;
+  twoFactorEnabledAt: Date | null;
   createdAt: Date;
 }
 
@@ -114,6 +115,7 @@ export function serialiseSessionUser(row: AccountRow): SessionUser {
     // they had been refused.
     kycRejectionReason: gate === "kyc_rejected" ? row.kycRejectionReason : null,
     suspendedReason: gate === "suspended" ? row.suspendedReason : null,
+    twoFactorEnabled: Boolean(row.twoFactorEnabledAt),
     createdAt: row.createdAt.toISOString(),
   };
 }

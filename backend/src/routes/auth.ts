@@ -26,7 +26,14 @@ import {
   OTP_MAX_ATTEMPTS,
   OTP_TTL_MS,
 } from "../security/codes";
-import { encryptField, encryptOptional, last4 } from "../security/field-crypto";
+import { encryptField, encryptOptional, decryptField, last4 } from "../security/field-crypto";
+import {
+  generateTotpSecret,
+  totpEnrolmentUri,
+  verifyTotp,
+  generateRecoveryCodes,
+  normaliseRecoveryCode,
+} from "../security/totp";
 import {
   computeGate,
   GATE_MESSAGES,
@@ -39,7 +46,10 @@ import { isProduction } from "../security/config";
 import { verificationCodeEmail } from "../email/templates";
 import {
   changeEmailSchema,
+  confirmTwoFactorSchema,
   confirmVerificationSchema,
+  disableTwoFactorSchema,
+  enrolTwoFactorSchema,
   kycSubmissionSchema,
   KYC_DOC_TYPES,
   registerAccountSchema,
@@ -47,6 +57,7 @@ import {
   signInSchema,
   type KycDocType,
   type KycStatusView,
+  type TwoFactorEnrolmentView,
 } from "../types";
 import { putKycObject, deleteKycObjects } from "../storage/kyc";
 
@@ -139,6 +150,7 @@ const ACCOUNT_SELECT = {
   kycReviewedAt: true,
   kycRejectionReason: true,
   suspendedReason: true,
+  twoFactorEnabledAt: true,
   createdAt: true,
 } as const;
 
@@ -444,6 +456,8 @@ authRouter.post("/login", validate("json", signInSchema), async (c) => {
       sessionEpoch: true,
       failedLoginCount: true,
       lockedUntil: true,
+      twoFactorSecretEnc: true,
+      twoFactorBackupCodes: true,
     },
   });
 
@@ -547,14 +561,81 @@ authRouter.post("/login", validate("json", signInSchema), async (c) => {
     return fail(c, 403, "ACCOUNT_BLOCKED", GATE_MESSAGES[computeGate(row)]);
   }
 
+  /* ---------------------------------------------------------- Second factor */
+
+  let mfaSatisfied = false;
+  let remainingBackupCodes: string[] | null = null;
+
+  if (row.twoFactorEnabledAt) {
+    const totp = input.totp?.trim() ?? "";
+    const recovery = input.recoveryCode?.trim() ?? "";
+
+    if (!totp && !recovery) {
+      // Password accepted, second factor still owed. No session is minted —
+      // this response grants nothing, it only tells the client which field
+      // to show next. Confirming the password was right is inherent to any
+      // two-step sign-in and is not a leak worth breaking the flow over.
+      return fail(c, 401, "MFA_REQUIRED", "Enter the 6-digit code from your authenticator app.");
+    }
+
+    if (totp) {
+      mfaSatisfied = verifyTotp(decryptField(row.twoFactorSecretEnc), totp);
+    } else {
+      const stored: string[] = row.twoFactorBackupCodes ? (JSON.parse(row.twoFactorBackupCodes) as string[]) : [];
+      const digest = createHash("sha256").update(normaliseRecoveryCode(recovery)).digest("hex");
+      if (stored.includes(digest)) {
+        mfaSatisfied = true;
+        remainingBackupCodes = stored.filter((entry) => entry !== digest);
+      }
+    }
+
+    if (!mfaSatisfied) {
+      const failures = row.failedLoginCount + 1;
+      const lock = failures >= 8;
+      await prisma.user.update({
+        where: { id: row.id },
+        data: { failedLoginCount: lock ? 0 : failures, lockedUntil: lock ? new Date(Date.now() + 15 * 60_000) : null },
+      });
+      await record(c, {
+        action: "user.mfa.failed",
+        outcome: "failure",
+        actorType: "user",
+        actorId: row.id,
+        actorLabel: row.email,
+        targetType: "user",
+        targetId: row.id,
+        detail: { failures, locked: lock, method: totp ? "totp" : "recovery_code" },
+      });
+      return fail(c, 401, "MFA_INVALID", "That code is not correct. Try the current code from your app.");
+    }
+
+    if (remainingBackupCodes) {
+      await record(c, {
+        action: "user.mfa.recovery_used",
+        outcome: "success",
+        actorType: "user",
+        actorId: row.id,
+        actorLabel: row.email,
+        targetType: "user",
+        targetId: row.id,
+        detail: { remaining: remainingBackupCodes.length },
+      });
+    }
+  }
+
   await prisma.user.update({
     where: { id: row.id },
-    data: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() },
+    data: {
+      failedLoginCount: 0,
+      lockedUntil: null,
+      lastLoginAt: new Date(),
+      ...(remainingBackupCodes ? { twoFactorBackupCodes: JSON.stringify(remainingBackupCodes) } : {}),
+    },
   });
 
   // Fresh session id on every successful sign-in: an attacker who planted a
   // known session id before login holds a dead one after it.
-  issueSession(c, { id: row.id, role: row.accountType, epoch: row.sessionEpoch });
+  issueSession(c, { id: row.id, role: row.accountType, epoch: row.sessionEpoch, mfa: mfaSatisfied });
 
   await record(c, {
     action: "user.login",
@@ -619,6 +700,139 @@ authRouter.get("/session", async (c) => {
 
   touchSession(c, session);
   return c.json({ data: serialiseSessionState(row) });
+});
+
+/* =========================================================== TWO-FACTOR */
+
+/**
+ * Start TOTP enrolment. Same design as the admin portal's (routes/
+ * admin-auth.ts): the secret is ENCRYPTED, not hashed — verification needs
+ * the original value back — returned exactly once, and `twoFactorEnabledAt`
+ * is cleared here (not confirmed), because from the moment a new secret
+ * exists the old one no longer verifies.
+ */
+authRouter.post("/2fa/enrol", requireUser(), validate("json", enrolTwoFactorSchema), async (c) => {
+  const account = c.get("account");
+  const input = c.req.valid("json");
+
+  if (account.twoFactorEnabledAt) {
+    const withHash = await prisma.user.findUnique({ where: { id: account.id }, select: { passwordHash: true } });
+    if (!input.currentPassword || !(await verifyPassword(input.currentPassword, withHash?.passwordHash ?? ""))) {
+      return fail(c, 401, "BAD_CREDENTIALS", "Enter your current password to replace your authenticator.");
+    }
+  }
+
+  const secret = generateTotpSecret();
+  await prisma.user.update({
+    where: { id: account.id },
+    data: { twoFactorSecretEnc: encryptField(secret), twoFactorEnabledAt: null, twoFactorBackupCodes: null },
+  });
+
+  await record(c, {
+    action: "user.mfa.enrolled",
+    outcome: "success",
+    actorType: "user",
+    actorId: account.id,
+    actorLabel: account.email,
+    targetType: "user",
+    targetId: account.id,
+    detail: { replacing: Boolean(account.twoFactorEnabledAt) },
+  });
+
+  const view: TwoFactorEnrolmentView = {
+    secret,
+    uri: totpEnrolmentUri({ secret, email: account.email }),
+    issuer: "PayBridge",
+  };
+  return c.json({ data: view });
+});
+
+/**
+ * Finish enrolment by proving a live code. MFA is marked enabled here, never
+ * at `/2fa/enrol` — "we stored the secret" is not evidence anyone can
+ * produce a code from it.
+ */
+authRouter.post("/2fa/enable", requireUser(), validate("json", confirmTwoFactorSchema), async (c) => {
+  const account = c.get("account");
+  const input = c.req.valid("json");
+
+  const withSecret = await prisma.user.findUnique({ where: { id: account.id }, select: { twoFactorSecretEnc: true } });
+  if (!withSecret?.twoFactorSecretEnc) {
+    return fail(c, 409, "MFA_NOT_ENROLLED", "Start again: scan the QR code, then enter a code from your app.");
+  }
+  if (!verifyTotp(decryptField(withSecret.twoFactorSecretEnc), input.code)) {
+    await record(c, {
+      action: "user.mfa.failed",
+      outcome: "failure",
+      actorType: "user",
+      actorId: account.id,
+      actorLabel: account.email,
+      targetType: "user",
+      targetId: account.id,
+      detail: { stage: "enable" },
+    });
+    return fail(c, 401, "MFA_INVALID", "That code is not correct. Check your app and enter the current code.");
+  }
+
+  const recoveryCodes = generateRecoveryCodes();
+  await prisma.user.update({
+    where: { id: account.id },
+    data: {
+      twoFactorEnabledAt: new Date(),
+      twoFactorBackupCodes: JSON.stringify(
+        recoveryCodes.map((code) => createHash("sha256").update(normaliseRecoveryCode(code)).digest("hex")),
+      ),
+    },
+  });
+
+  await record(c, {
+    action: "user.mfa.enabled",
+    outcome: "success",
+    actorType: "user",
+    actorId: account.id,
+    actorLabel: account.email,
+    targetType: "user",
+    targetId: account.id,
+    detail: { recoveryCodesIssued: recoveryCodes.length },
+  });
+
+  // The plaintext codes appear here and nowhere else, ever. Only digests are
+  // stored, so a lost set cannot be recovered — only reissued by enrolling again.
+  return c.json({ data: { recoveryCodes } });
+});
+
+/** Turn two-factor authentication off. Requires the password AND a live code — removing a security control needs the same proof as changing one. */
+authRouter.post("/2fa/disable", requireUser(), validate("json", disableTwoFactorSchema), async (c) => {
+  const account = c.get("account");
+  const input = c.req.valid("json");
+
+  const withSecrets = await prisma.user.findUnique({
+    where: { id: account.id },
+    select: { passwordHash: true, twoFactorSecretEnc: true },
+  });
+  if (!(await verifyPassword(input.password, withSecrets?.passwordHash ?? ""))) {
+    return fail(c, 401, "BAD_CREDENTIALS", "That password is not correct.");
+  }
+  if (!verifyTotp(decryptField(withSecrets?.twoFactorSecretEnc), input.code)) {
+    return fail(c, 401, "MFA_INVALID", "That code is not correct.");
+  }
+
+  await prisma.user.update({
+    where: { id: account.id },
+    data: { twoFactorSecretEnc: null, twoFactorEnabledAt: null, twoFactorBackupCodes: null },
+  });
+
+  await record(c, {
+    action: "user.mfa.disabled",
+    outcome: "success",
+    actorType: "user",
+    actorId: account.id,
+    actorLabel: account.email,
+    targetType: "user",
+    targetId: account.id,
+  });
+
+  return c.json({ data: { disabled: true } });
 });
 
 /* ========================================================== VERIFICATION */

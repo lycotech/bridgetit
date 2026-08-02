@@ -4,10 +4,13 @@ import type {
   AcceptEmployeeLinkInput,
   BridgeDrawView,
   ChangeEmailInput,
+  ConfirmTwoFactorInput,
   ConfirmVerificationInput,
   CreateInvestmentCommitmentInput,
   CreateSavingsGoalInput,
+  DisableTwoFactorInput,
   EligibilityView,
+  EnrolTwoFactorInput,
   InvestmentCommitmentView,
   KycStatusView,
   KycSubmissionInput,
@@ -20,6 +23,7 @@ import type {
   SessionGate,
   SessionState,
   SignInInput,
+  TwoFactorEnrolmentView,
   VerificationDispatch,
 } from "../../../../backend/src/types";
 
@@ -202,6 +206,31 @@ export function useRequestBridgeDraw() {
       void qc.invalidateQueries({ queryKey: ["account", "bridge", "draws"] });
       void qc.invalidateQueries({ queryKey: ["account", "eligibility"] });
     },
+  });
+}
+
+/* ---------------------------------------------------------- TWO-FACTOR */
+
+export function useEnrolTwoFactor() {
+  return useMutation({
+    mutationFn: (input: EnrolTwoFactorInput) => api.post<TwoFactorEnrolmentView>("/api/auth/2fa/enrol", input),
+  });
+}
+
+export function useEnableTwoFactor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ConfirmTwoFactorInput) =>
+      api.post<{ recoveryCodes: string[] }>("/api/auth/2fa/enable", input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: SESSION_KEY }),
+  });
+}
+
+export function useDisableTwoFactor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: DisableTwoFactorInput) => api.post<{ disabled: boolean }>("/api/auth/2fa/disable", input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: SESSION_KEY }),
   });
 }
 

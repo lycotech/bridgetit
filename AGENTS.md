@@ -31,7 +31,7 @@ PRD.md names 14 backend services. Here is what actually exists for each, in
 
 | Service (per PRD) | Status | Evidence |
 |---|---|---|
-| **Authentication** | ✅ Built | `auth.ts` — custom session system (not Better Auth): Argon2id, HMAC-signed `__Host-` cookies, rate limiting/lockout, double-submit CSRF. Separate `admin-auth.ts`/`staff-session.ts` with real TOTP MFA for staff. |
+| **Authentication** | ✅ Built | `auth.ts` — custom session system (not Better Auth): Argon2id, HMAC-signed `__Host-` cookies, rate limiting/lockout, double-submit CSRF. Separate `admin-auth.ts`/`staff-session.ts` with real TOTP MFA for staff. **Customer and employer 2FA added (2026-08-02)**: `User.twoFactorSecretEnc`/`twoFactorEnabledAt`/`twoFactorBackupCodes` and the identical fields on `EmployerUser` (migration `20260802204121_add_two_factor_auth`) — the same TOTP design staff already had, extended to real customer (`/api/auth/2fa/*`) and employer (`/api/employer/2fa/*`) accounts. Login now supports the two-step password-then-code flow (`MFA_REQUIRED` response, optional `totp`/`recoveryCode` fields), with single-use recovery codes as a backup. Real UI: a "Two-factor authentication" panel on the customer `/account` page and on `/employer-portal`, sharing one component (`webapp/src/components/account/TwoFactorPanel.tsx`). The "coming soon" 2FA placeholders in the mock demo dashboards (`employee/Profile.tsx`, `employer/Settings.tsx`, `investor/Profile.tsx`, `operations/Settings.tsx`) are a different, still-unwired system and were left untouched. |
 | **Admin** | ✅ Built | `admin.ts`, `admin-users.ts`, `admin-audit.ts`, `admin-invitations.ts`, `admin-support.ts` — registration/lead CRM, RBAC staff accounts, append-only audit log, CSV export, demo invitation lifecycle. Wired to real admin portal pages. |
 | **Notifications** | ⚠️ Partial | `email/mailer.ts` — real SMTP/Resend send with safe log-only dev fallback, wired into registration/verification/support/welcome flows. Email only — no SMS/push. Currently unconfigured in production (no `MAIL_TRANSPORT`/`SMTP_HOST`/`RESEND_API_KEY` set), so OTP/verification emails are silently not sent — see §5. |
 | **Risk & Compliance** | ✅ Wired (2026-08-01) | `backend/src/routes/admin-risk.ts` (`/api/admin/risk/*`) calls the untouched `eir/risk/*` engine for real: `backend/src/eir/scoring-input.ts` assembles a `ScoringInput` from actual `Employer`/`Director`/`BeneficialOwner`/`EmployerDocument`/`BankAccount`/`Consent`/`PayrollCycle`/`FinancialPeriod`/`EmployerUser` rows; `backend/src/eir/policy-store.ts` loads/seeds a `ScoringPolicyVersion` from `DEFAULT_POLICY`; `backend/src/eir/persist-score.ts` writes `EmployerScore`+`ScoreComponent`+`KnockoutEvaluation`+`LimitRecommendation` and updates `Employer.currentScore/currentTier/earlyWarningLevel`. A decision route resolves the engine's own authority matrix (`resolveAuthority`) and, on approval, sets `Employer.status = "active"` — the exact field the Eligibility Engine's `employerActive` check reads, so an approval now actually unblocks employees. Real UI at `/admin/risk` (needs `risk.view`/`risk.decide`, currently `super_admin` + `operations_admin` view-only). **Known, deliberate gaps** (see §3 and §6 below): the full 19-stage `eir/risk/workflow.ts` state machine is NOT enforced (a minimal `Application` row is auto-created only so `CreditDecision`'s required relation is satisfiable); `DEFAULT_POLICY`'s authority matrix ships with every threshold `null` (by the engine's own design — unconfigured means zero authority, not unlimited), so most decisions will correctly report "no authority configured" until a policy-editor screen exists to set real numbers; most `ScoringInput` fields (director identity verification, beneficial-owner/compliance screening, financial statements, behavioural history) have no capture flow anywhere in the product yet, so a fresh employer will score thin/low — that's the engine correctly reporting insufficient data, not a bug. |
@@ -155,7 +155,7 @@ tick items off here as they land rather than treating this as a static plan.
 9. ✅ **Savings / Investments / Reporting** — done (2026-08-02), see §2. Built as ledger-only /
    aggregate-only by explicit user decision, given step 8's deferral means neither Savings nor
    Investments can move real money yet.
-10. Customer-facing 2FA (currently staff/admin-only).
+10. ✅ **Customer-facing 2FA** — done (2026-08-02), see §2.
 11. Test coverage for every area above as it goes real — `risk.test.ts` is currently the *only*
     test file in the repo; no tests exist for any route, `session.ts`, `passwords.ts`, CSRF, or
     anywhere in `webapp/`.
@@ -167,9 +167,11 @@ tick items off here as they land rather than treating this as a static plan.
   `backend/render.yaml` / `webapp/vercel.json` for the actual deploy config.
 - `KYC_ENCRYPTION_KEY` has no rotation path — treat as permanent once real KYC data exists
   (see the comment in `backend/src/env.ts`).
-- Four migrations exist in `backend/prisma/migrations/`: `20260729230713_init`,
+- Five migrations exist in `backend/prisma/migrations/`: `20260729230713_init`,
   `20260801153307_link_employee_record_to_user` (adds `EmployeeRecord.userId`, nullable +
-  unique), `20260802175005_add_bridge_draw` (new `BridgeDraw` table), and
+  unique), `20260802175005_add_bridge_draw` (new `BridgeDraw` table),
   `20260802184356_add_savings_investments` (new `SavingsGoal`/`SavingsTransaction`/
-  `InvestmentCommitment` tables). Render's `startCommand` runs `prisma migrate deploy` on every
-  deploy, so all four are applied automatically — nothing manual needed on the Render side.
+  `InvestmentCommitment` tables), and `20260802204121_add_two_factor_auth` (adds
+  `twoFactorSecretEnc`/`twoFactorEnabledAt`/`twoFactorBackupCodes` to `User` and
+  `EmployerUser`). Render's `startCommand` runs `prisma migrate deploy` on every deploy, so all
+  five are applied automatically — nothing manual needed on the Render side.

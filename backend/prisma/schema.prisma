@@ -348,6 +348,14 @@ model User {
   lockedUntil      DateTime?
   lastLoginAt      DateTime?
 
+  // ---- Two-factor authentication (TOTP) — same design as AdminUser's mfa*
+  // fields. Encrypted, not hashed: verification needs the original secret
+  // back. Set at /2fa/enable, never at /2fa/enrol — see routes/auth.ts.
+  twoFactorSecretEnc   String?
+  twoFactorEnabledAt   DateTime?
+  /// sha256 of each single-use recovery code, JSON array. Consumed on use.
+  twoFactorBackupCodes String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -784,6 +792,12 @@ model EmployerUser {
   sessionEpoch     Int       @default(1)
   failedLoginCount Int       @default(0)
   lockedUntil      DateTime?
+
+  // ---- Two-factor authentication (TOTP) — same design as User's and
+  // AdminUser's equivalent fields. See routes/employer.ts.
+  twoFactorSecretEnc   String?
+  twoFactorEnabledAt   DateTime?
+  twoFactorBackupCodes String?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

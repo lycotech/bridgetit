@@ -18,11 +18,15 @@ import {
 } from "lucide-react";
 import { AccountLayout } from "@/components/account/AccountLayout";
 import { ActionButton } from "@/components/dashboard/PageHeader";
+import { TwoFactorPanel } from "@/components/account/TwoFactorPanel";
 import {
   useBridgeDraws,
   useCreateInvestmentCommitment,
   useCreateSavingsGoal,
+  useDisableTwoFactor,
   useEligibility,
+  useEnableTwoFactor,
+  useEnrolTwoFactor,
   useInvestmentCommitments,
   useKycStatus,
   usePortfolioSnapshot,
@@ -458,6 +462,20 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+/**
+ * Two-factor authentication — real, backend/src/routes/auth.ts's `/2fa/*`.
+ * Same TOTP design PayBridge staff already use, extended to real customer
+ * accounts. Every "coming soon" 2FA placeholder across the mock dashboards
+ * (employee/Profile.tsx, employer/Settings.tsx, investor/Profile.tsx) is
+ * about a different, unwired system — this is the one that actually works.
+ */
+function TwoFactorSection({ enabled }: { enabled: boolean }) {
+  const enrol = useEnrolTwoFactor();
+  const enable = useEnableTwoFactor();
+  const disable = useDisableTwoFactor();
+  return <TwoFactorPanel enabled={enabled} enrol={enrol} enable={enable} disable={disable} />;
+}
+
 export default function AccountHome() {
   const { data: session } = useSession();
   const gate = session?.gate ?? "kyc_pending";
@@ -557,6 +575,7 @@ export default function AccountHome() {
       <BridgeRequestSection />
       <SavingsSection />
       {user?.accountType === "investor" ? <InvestmentSection /> : null}
+      <TwoFactorSection enabled={user?.twoFactorEnabled ?? false} />
 
       <div className="grid gap-3 sm:grid-cols-2">
         {LOCKED_FEATURES.map((feature) => (

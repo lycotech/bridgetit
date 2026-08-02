@@ -14,10 +14,16 @@ import {
   type EmployerSessionPayload,
 } from "../security/employer-session";
 import { burnPasswordTime, checkPasswordPolicy, hashPassword, verifyPassword } from "../security/passwords";
+import { decryptField, encryptField } from "../security/field-crypto";
+import { generateTotpSecret, totpEnrolmentUri, verifyTotp, generateRecoveryCodes, normaliseRecoveryCode } from "../security/totp";
+import { createHash } from "node:crypto";
 import { sendMail } from "../email/mailer";
 import { PARTNERSHIPS } from "../email/identities";
 import {
   acceptEmployerInviteSchema,
+  confirmTwoFactorSchema,
+  disableTwoFactorSchema,
+  enrolTwoFactorSchema,
   EMPLOYER_TEAM_ROLE_LABELS,
   inviteEmployerTeamMemberSchema,
   registerEmployerSchema,
@@ -27,6 +33,7 @@ import {
   type EmployerSessionView,
   type EmployerTeamMemberView,
   type EmployerTeamRole,
+  type TwoFactorEnrolmentView,
 } from "../types";
 
 /**
@@ -142,6 +149,7 @@ async function sessionViewFor(payload: EmployerSessionPayload | null): Promise<E
     employerId: null,
     employerName: null,
     employerStatus: null,
+    twoFactorEnabled: false,
   };
   if (!payload) return ANONYMOUS;
 
@@ -154,6 +162,7 @@ async function sessionViewFor(payload: EmployerSessionPayload | null): Promise<E
       role: true,
       status: true,
       sessionEpoch: true,
+      twoFactorEnabledAt: true,
       employer: { select: { registeredName: true, status: true } },
     },
   });
@@ -168,6 +177,7 @@ async function sessionViewFor(payload: EmployerSessionPayload | null): Promise<E
     employerId: payload.employerId,
     employerName: row.employer.registeredName,
     employerStatus: row.employer.status as EmployerSessionView["employerStatus"],
+    twoFactorEnabled: Boolean(row.twoFactorEnabledAt),
   };
 }
 
@@ -266,6 +276,9 @@ employerRouter.post("/login", validate("json", employerSignInSchema), async (c) 
       sessionEpoch: true,
       failedLoginCount: true,
       lockedUntil: true,
+      twoFactorSecretEnc: true,
+      twoFactorBackupCodes: true,
+      twoFactorEnabledAt: true,
     },
   });
 
@@ -335,9 +348,72 @@ employerRouter.post("/login", validate("json", employerSignInSchema), async (c) 
     return fail(c, 403, "ACCOUNT_SUSPENDED", "Your access has been suspended. Contact your company admin.");
   }
 
+  /* ---------------------------------------------------------- Second factor */
+
+  let mfaSatisfied = false;
+  let remainingBackupCodes: string[] | null = null;
+
+  if (row.twoFactorEnabledAt) {
+    const totp = input.totp?.trim() ?? "";
+    const recovery = input.recoveryCode?.trim() ?? "";
+
+    if (!totp && !recovery) {
+      return fail(c, 401, "MFA_REQUIRED", "Enter the 6-digit code from your authenticator app.");
+    }
+
+    if (totp) {
+      mfaSatisfied = verifyTotp(decryptField(row.twoFactorSecretEnc), totp);
+    } else {
+      const stored: string[] = row.twoFactorBackupCodes ? (JSON.parse(row.twoFactorBackupCodes) as string[]) : [];
+      const digest = createHash("sha256").update(normaliseRecoveryCode(recovery)).digest("hex");
+      if (stored.includes(digest)) {
+        mfaSatisfied = true;
+        remainingBackupCodes = stored.filter((entry) => entry !== digest);
+      }
+    }
+
+    if (!mfaSatisfied) {
+      const failures = row.failedLoginCount + 1;
+      const lock = failures >= 8;
+      await prisma.employerUser.update({
+        where: { id: row.id },
+        data: { failedLoginCount: lock ? 0 : failures, lockedUntil: lock ? new Date(Date.now() + 15 * 60_000) : null },
+      });
+      await record(c, {
+        action: "employer.mfa.failed",
+        outcome: "failure",
+        actorType: "user",
+        actorId: row.id,
+        actorLabel: row.email,
+        targetType: "employer_user",
+        targetId: row.id,
+        detail: { failures, locked: lock, method: totp ? "totp" : "recovery_code" },
+      });
+      return fail(c, 401, "MFA_INVALID", "That code is not correct. Try the current code from your app.");
+    }
+
+    if (remainingBackupCodes) {
+      await record(c, {
+        action: "employer.mfa.recovery_used",
+        outcome: "success",
+        actorType: "user",
+        actorId: row.id,
+        actorLabel: row.email,
+        targetType: "employer_user",
+        targetId: row.id,
+        detail: { remaining: remainingBackupCodes.length },
+      });
+    }
+  }
+
   await prisma.employerUser.update({
     where: { id: row.id },
-    data: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() },
+    data: {
+      failedLoginCount: 0,
+      lockedUntil: null,
+      lastLoginAt: new Date(),
+      ...(remainingBackupCodes ? { twoFactorBackupCodes: JSON.stringify(remainingBackupCodes) } : {}),
+    },
   });
 
   issueEmployerSession(c, { id: row.id, employerId: row.employerId, role: row.role, epoch: row.sessionEpoch });
@@ -378,6 +454,145 @@ employerRouter.post("/logout", async (c) => {
 employerRouter.get("/session", async (c) => {
   return c.json({ data: await sessionViewFor(readEmployerSession(c)) });
 });
+
+/* =========================================================== TWO-FACTOR */
+
+employerRouter.post(
+  "/2fa/enrol",
+  requireEmployerUser(),
+  validate("json", enrolTwoFactorSchema),
+  async (c) => {
+    const actor = c.get("employerUser")!;
+    const input = c.req.valid("json");
+
+    const current = await prisma.employerUser.findUniqueOrThrow({
+      where: { id: actor.id },
+      select: { passwordHash: true, twoFactorEnabledAt: true },
+    });
+    if (current.twoFactorEnabledAt) {
+      if (!input.currentPassword || !(await verifyPassword(input.currentPassword, current.passwordHash ?? ""))) {
+        return fail(c, 401, "BAD_CREDENTIALS", "Enter your current password to replace your authenticator.");
+      }
+    }
+
+    const secret = generateTotpSecret();
+    await prisma.employerUser.update({
+      where: { id: actor.id },
+      data: { twoFactorSecretEnc: encryptField(secret), twoFactorEnabledAt: null, twoFactorBackupCodes: null },
+    });
+
+    await record(c, {
+      action: "employer.mfa.enrolled",
+      outcome: "success",
+      actorType: "user",
+      actorId: actor.id,
+      actorLabel: actor.email,
+      targetType: "employer_user",
+      targetId: actor.id,
+      detail: { replacing: Boolean(current.twoFactorEnabledAt) },
+    });
+
+    const view: TwoFactorEnrolmentView = {
+      secret,
+      uri: totpEnrolmentUri({ secret, email: actor.email }),
+      issuer: "PayBridge",
+    };
+    return c.json({ data: view });
+  },
+);
+
+employerRouter.post(
+  "/2fa/enable",
+  requireEmployerUser(),
+  validate("json", confirmTwoFactorSchema),
+  async (c) => {
+    const actor = c.get("employerUser")!;
+    const input = c.req.valid("json");
+
+    const withSecret = await prisma.employerUser.findUnique({
+      where: { id: actor.id },
+      select: { twoFactorSecretEnc: true },
+    });
+    if (!withSecret?.twoFactorSecretEnc) {
+      return fail(c, 409, "MFA_NOT_ENROLLED", "Start again: scan the QR code, then enter a code from your app.");
+    }
+    if (!verifyTotp(decryptField(withSecret.twoFactorSecretEnc), input.code)) {
+      await record(c, {
+        action: "employer.mfa.failed",
+        outcome: "failure",
+        actorType: "user",
+        actorId: actor.id,
+        actorLabel: actor.email,
+        targetType: "employer_user",
+        targetId: actor.id,
+        detail: { stage: "enable" },
+      });
+      return fail(c, 401, "MFA_INVALID", "That code is not correct. Check your app and enter the current code.");
+    }
+
+    const recoveryCodes = generateRecoveryCodes();
+    await prisma.employerUser.update({
+      where: { id: actor.id },
+      data: {
+        twoFactorEnabledAt: new Date(),
+        twoFactorBackupCodes: JSON.stringify(
+          recoveryCodes.map((code) => createHash("sha256").update(normaliseRecoveryCode(code)).digest("hex")),
+        ),
+      },
+    });
+
+    await record(c, {
+      action: "employer.mfa.enabled",
+      outcome: "success",
+      actorType: "user",
+      actorId: actor.id,
+      actorLabel: actor.email,
+      targetType: "employer_user",
+      targetId: actor.id,
+      detail: { recoveryCodesIssued: recoveryCodes.length },
+    });
+
+    return c.json({ data: { recoveryCodes } });
+  },
+);
+
+employerRouter.post(
+  "/2fa/disable",
+  requireEmployerUser(),
+  validate("json", disableTwoFactorSchema),
+  async (c) => {
+    const actor = c.get("employerUser")!;
+    const input = c.req.valid("json");
+
+    const withSecrets = await prisma.employerUser.findUnique({
+      where: { id: actor.id },
+      select: { passwordHash: true, twoFactorSecretEnc: true },
+    });
+    if (!(await verifyPassword(input.password, withSecrets?.passwordHash ?? ""))) {
+      return fail(c, 401, "BAD_CREDENTIALS", "That password is not correct.");
+    }
+    if (!verifyTotp(decryptField(withSecrets?.twoFactorSecretEnc), input.code)) {
+      return fail(c, 401, "MFA_INVALID", "That code is not correct.");
+    }
+
+    await prisma.employerUser.update({
+      where: { id: actor.id },
+      data: { twoFactorSecretEnc: null, twoFactorEnabledAt: null, twoFactorBackupCodes: null },
+    });
+
+    await record(c, {
+      action: "employer.mfa.disabled",
+      outcome: "success",
+      actorType: "user",
+      actorId: actor.id,
+      actorLabel: actor.email,
+      targetType: "employer_user",
+      targetId: actor.id,
+    });
+
+    return c.json({ data: { disabled: true } });
+  },
+);
 
 /* ============================================================== PROFILE */
 

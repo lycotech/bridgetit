@@ -2,9 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type {
   AcceptEmployerInviteInput,
+  ConfirmTwoFactorInput,
+  DisableTwoFactorInput,
   EmployerSessionView,
   EmployerSignInInput,
+  EnrolTwoFactorInput,
   RegisterEmployerInput,
+  TwoFactorEnrolmentView,
 } from "../../../../backend/src/types";
 
 /**
@@ -28,6 +32,7 @@ const ANONYMOUS: EmployerSessionView = {
   employerId: null,
   employerName: null,
   employerStatus: null,
+  twoFactorEnabled: false,
 };
 
 export function useEmployerSession() {
@@ -66,6 +71,29 @@ export function useEmployerLogout() {
       qc.setQueryData(EMPLOYER_SESSION_KEY, ANONYMOUS);
       qc.removeQueries({ queryKey: ["employer"], exact: false });
     },
+  });
+}
+
+export function useEnrolEmployerTwoFactor() {
+  return useMutation({
+    mutationFn: (input: EnrolTwoFactorInput) => api.post<TwoFactorEnrolmentView>("/api/employer/2fa/enrol", input),
+  });
+}
+
+export function useEnableEmployerTwoFactor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ConfirmTwoFactorInput) =>
+      api.post<{ recoveryCodes: string[] }>("/api/employer/2fa/enable", input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: EMPLOYER_SESSION_KEY }),
+  });
+}
+
+export function useDisableEmployerTwoFactor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: DisableTwoFactorInput) => api.post<{ disabled: boolean }>("/api/employer/2fa/disable", input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: EMPLOYER_SESSION_KEY }),
   });
 }
 

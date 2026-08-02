@@ -566,8 +566,61 @@ export const signInSchema = z.object({
    * the account exists and what its password does not contain.
    */
   password: z.string().min(1, "Enter your password.").max(200),
+  /**
+   * TOTP code, when the account has two-factor authentication enabled.
+   * Optional because the first step of a two-step sign-in legitimately
+   * arrives without it — the route decides whether it was required.
+   */
+  totp: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator.")
+    .optional()
+    .or(z.literal("")),
+  /** Single-use recovery code, as an alternative to `totp`. */
+  recoveryCode: z.string().trim().max(40).optional().or(z.literal("")),
 });
 export type SignInInput = z.infer<typeof signInSchema>;
+
+/* -------------------------------------------------------- TWO-FACTOR AUTH */
+
+/**
+ * Shared by customer accounts (routes/auth.ts) and employer team accounts
+ * (routes/employer.ts) — the same TOTP design PayBridge staff already use
+ * (security/totp.ts, routes/admin-auth.ts), extended to the two account
+ * types that didn't have it. See AGENTS.md, "Customer-facing 2FA".
+ */
+export const enrolTwoFactorSchema = z.object({
+  /** Required only when replacing an already-enabled authenticator. */
+  currentPassword: z.string().min(1).max(200).optional(),
+});
+export type EnrolTwoFactorInput = z.infer<typeof enrolTwoFactorSchema>;
+
+export const twoFactorEnrolmentSchema = z.object({
+  /** Base32 secret, for typing into an app that cannot scan. */
+  secret: z.string(),
+  /** otpauth:// URI, rendered as a QR code. */
+  uri: z.string(),
+  issuer: z.string(),
+});
+export type TwoFactorEnrolmentView = z.infer<typeof twoFactorEnrolmentSchema>;
+
+export const confirmTwoFactorSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator."),
+});
+export type ConfirmTwoFactorInput = z.infer<typeof confirmTwoFactorSchema>;
+
+export const disableTwoFactorSchema = z.object({
+  password: z.string().min(1, "Enter your password.").max(200),
+  code: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator."),
+});
+export type DisableTwoFactorInput = z.infer<typeof disableTwoFactorSchema>;
 
 export const VERIFICATION_CHANNELS = ["email", "phone"] as const;
 export type VerificationChannel = (typeof VERIFICATION_CHANNELS)[number];
@@ -664,6 +717,7 @@ export const sessionUserSchema = z.object({
   kycRejectionReason: z.string().nullable(),
   /** Safe to display. Null unless the account is suspended. */
   suspendedReason: z.string().nullable(),
+  twoFactorEnabled: z.boolean(),
   createdAt: z.string(),
 });
 export type SessionUser = z.infer<typeof sessionUserSchema>;
@@ -840,6 +894,13 @@ export type RegisterEmployerInput = z.infer<typeof registerEmployerSchema>;
 export const employerSignInSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email address."),
   password: z.string().min(1, "Enter your password."),
+  totp: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator.")
+    .optional()
+    .or(z.literal("")),
+  recoveryCode: z.string().trim().max(40).optional().or(z.literal("")),
 });
 export type EmployerSignInInput = z.infer<typeof employerSignInSchema>;
 
@@ -853,6 +914,7 @@ export const employerSessionSchema = z.object({
   employerId: z.string().nullable(),
   employerName: z.string().nullable(),
   employerStatus: z.enum(EMPLOYER_STATUSES).nullable(),
+  twoFactorEnabled: z.boolean(),
 });
 export type EmployerSessionView = z.infer<typeof employerSessionSchema>;
 
@@ -1736,6 +1798,11 @@ export const AUDIT_ACTIONS = [
   "user.password.changed",
   "user.suspended",
   "user.reinstated",
+  "user.mfa.enrolled",
+  "user.mfa.enabled",
+  "user.mfa.disabled",
+  "user.mfa.failed",
+  "user.mfa.recovery_used",
 
   // Employer accounts — company onboarding and the team that manages it
   "employer.registered",
@@ -1749,6 +1816,11 @@ export const AUDIT_ACTIONS = [
   "employer.team.role_changed",
   "employer.team.suspended",
   "employer.team.reinstated",
+  "employer.mfa.enrolled",
+  "employer.mfa.enabled",
+  "employer.mfa.disabled",
+  "employer.mfa.failed",
+  "employer.mfa.recovery_used",
   "employer.payroll.cycle_created",
   "employer.payroll.uploaded",
   "employee.link.invited",
