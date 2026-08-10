@@ -7,6 +7,7 @@ import { HowItWorks } from "@/components/sections/HowItWorks";
 import { WhoItServes } from "@/components/sections/WhoItServes";
 import { BeyondBridge } from "@/components/sections/BeyondBridge";
 import { OnePayroll } from "@/components/sections/OnePayroll";
+import { PayrollFit } from "@/components/sections/PayrollFit";
 import { EmployerStory } from "@/components/sections/EmployerStory";
 import { Manifesto } from "@/components/sections/Manifesto";
 import { Trust } from "@/components/sections/Trust";
@@ -45,6 +46,7 @@ const Index = () => {
         <WhoItServes />
         <BeyondBridge />
         <OnePayroll />
+        <PayrollFit />
         <EmployerStory />
         <Manifesto />
         <Trust />

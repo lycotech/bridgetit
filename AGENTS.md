@@ -228,7 +228,10 @@ in-app "Bridge ₦X" transaction label stays):**
    `components/sections/OnePayroll.tsx`, copy matches the brief verbatim including the "designed
    to" hedge, wired into `pages/Index.tsx` right after `BeyondBridge` (pillars → employer
    objection, matching the brief's desired flow order). Typecheck passes.
-3. ⬜ New 4-step "How PayBridge fits into payroll" section (brief §3) — net-new component.
+3. ✅ New 4-step "How PayBridge fits into payroll" section (brief §3, 2026-08-11) — net-new
+   `components/sections/PayrollFit.tsx`, modeled on the existing `HowItWorks.tsx` timeline
+   pattern (mobile vertical / desktop horizontal, final step marked as the outcome), wired into
+   `pages/Index.tsx` right after `OnePayroll`. Typecheck passes.
 4. ⬜ New "Your PayBridge Account" product section (brief §4) — net-new component; never call it
    an intermediate/collection account or virtual salary wallet in copy.
 5. ⬜ Access product copy — eligibility-gated language (brief §5).
