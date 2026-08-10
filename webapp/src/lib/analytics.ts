@@ -15,6 +15,10 @@ declare global {
 
 export type AnalyticsEvent =
   | "hero_cta_click"
+  // Hero now splits into two audience CTAs instead of one generic one — tracked
+  // separately so we can see whether employee or employer interest leads.
+  | "hero_employee_cta_click"
+  | "hero_employer_cta_click"
   | "nav_cta_click"
   // Someone who already has an account looking for the way in. Worth measuring
   // separately from the registration CTA: a rising ratio means returning users,

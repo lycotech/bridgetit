@@ -29,6 +29,28 @@ This workspace contains a mobile app and backend server.
   </shared_types>
 </coordination>
 
+<brand_copy>
+  Full positioning/copy brief: WEBSITE_COPY_BRIEF.md. Pending work tracked in AGENTS.md §8.
+  Read the brief before writing or editing any public-facing marketing copy (homepage,
+  employer/employee landing pages, footer, registration flow copy).
+
+  Hard rules:
+  - Primary line is "Financial wellbeing, built around work." — "From payroll to prosperity" is
+    secondary only, never the lead promise.
+  - PayBridge works AROUND an employer's existing payroll — never imply it replaces or duplicates
+    payroll, or that it's fully automated / integrated with every provider.
+  - Employees keep their existing bank — PayBridge never claims to require abandoning it.
+  - Never publicly call users "Bridgers" — use Employees / Employers / Funding Partners. The
+    in-app transaction label "Bridge ₦X" is fine; the public audience category is not.
+  - Never say "No documents" — say "Simple digital onboarding" (KYC/verification still applies).
+  - Never call the product account an "intermediate account," "collection account," or "virtual
+    salary wallet" — always "PayBridge Account."
+  - Never claim a fixed investment return (e.g. "18% p.a."), guaranteed automation, universal
+    payroll-provider support, or that employers see nothing — see WEBSITE_COPY_BRIEF.md "Hard
+    rules" for the full forbidden-claims list. Hedge with "designed to," "where supported,"
+    "subject to eligibility," "through regulated partners."
+</brand_copy>
+
 <skills>
   Project skills:
   - frontend-developer: Changes to the webapp frontend (read webapp/CLAUDE.md)

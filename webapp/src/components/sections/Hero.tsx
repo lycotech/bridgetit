@@ -40,27 +40,62 @@ export function Hero() {
         {/* Copy */}
         <div>
           <Reveal>
-            <SectionLabel>The future of payday</SectionLabel>
+            <SectionLabel>Financial wellbeing, built around work.</SectionLabel>
           </Reveal>
 
           <Reveal delay={0.05}>
             <h1 className="mt-5 font-display text-[2.7rem] font-extrabold leading-[1.03] tracking-tight text-foreground sm:text-6xl lg:text-[4.25rem]">
-              You work every day.
+              Life does not <span className="text-primary">always wait</span>
               <br />
-              <span className="text-primary">Why wait</span> until payday?
+              for payday.
             </h1>
           </Reveal>
 
           <Reveal delay={0.12}>
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground">
-              PayBridge helps eligible employees bridge an approved portion of verified earnings
-              already accumulated—responsibly, transparently and through participating employers.
+              PayBridge helps eligible employees responsibly access part of their verified earned
+              income when needed, while building stronger financial habits through savings,
+              investments and practical financial education.
             </p>
           </Reveal>
 
+          <Reveal delay={0.16}>
+            <dl className="mt-7 grid max-w-xl gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-border bg-card/60 p-4">
+                <dt className="text-xs font-semibold uppercase tracking-widest text-primary">
+                  For employees
+                </dt>
+                <dd className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                  Greater financial flexibility without abandoning your existing bank.
+                </dd>
+              </div>
+              <div className="rounded-xl border border-border bg-card/60 p-4">
+                <dt className="text-xs font-semibold uppercase tracking-widest text-primary">
+                  For employers
+                </dt>
+                <dd className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                  One payroll process, less salary-advance administration and a more structured
+                  approach to employee financial wellbeing.
+                </dd>
+              </div>
+            </dl>
+          </Reveal>
+
           <Reveal delay={0.18}>
-            <div className="mt-7">
-              <CtaButton event="hero_cta_click" size="lg" label="Get on the Bridge" />
+            <div className="mt-7 flex flex-wrap gap-3">
+              <CtaButton
+                event="hero_employee_cta_click"
+                size="lg"
+                label="For Employees"
+                to="/get-on-the-bridge/employee"
+              />
+              <CtaButton
+                event="hero_employer_cta_click"
+                size="lg"
+                variant="ghost"
+                label="For Employers"
+                to="/employers"
+              />
             </div>
           </Reveal>
 

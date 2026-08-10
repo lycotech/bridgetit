@@ -175,3 +175,82 @@ tick items off here as they land rather than treating this as a static plan.
   `twoFactorSecretEnc`/`twoFactorEnabledAt`/`twoFactorBackupCodes` to `User` and
   `EmployerUser`). Render's `startCommand` runs `prisma migrate deploy` on every deploy, so all
   five are applied automatically — nothing manual needed on the Render side.
+
+## 8. Website copy — pending brand/positioning update (added 2026-08-10)
+
+Full target copy lives in **[WEBSITE_COPY_BRIEF.md](WEBSITE_COPY_BRIEF.md)** — implement from
+there, not from this summary. Status: **not started**, pure copy/positioning brief received, no
+implementation yet. Core shift: PayBridge must stop reading like a second payroll system —
+it works around an employer's existing payroll, and employees keep their existing bank.
+
+**Structural conflicts found while grounding the brief against the live code** (not just copy
+swaps — need a product/design decision before implementing):
+
+- **Primary tagline conflict.** The brief demotes "From payroll to prosperity" to a secondary
+  expression and wants "Financial wellbeing, built around work." as the lead. But "From payroll
+  to prosperity" is currently the *primary* brand lockup, drawn into the logomark itself, not
+  just page copy: `webapp/src/lib/brand.ts:46-49` (`TAGLINE`/`TAGLINE_LOCKUP`),
+  `components/brand/Logo.tsx`, `components/brand/Tagline.tsx`, `components/brand/SectionLabel.tsx`,
+  and `components/sections/Manifesto.tsx` (a whole section built around animating this phrase).
+  This is a brand-design change, not a text edit.
+- **Pillar naming mismatch.** The brief says "Keep: Access. Save. Invest. Learn." as if it
+  already exists — it doesn't. The live homepage pillars in
+  `components/sections/BeyondBridge.tsx` are **Bridge / Build / Grow**, and there's no "Learn"
+  pillar anywhere yet. Needs a decision: rename Bridge/Build/Grow to Access/Save/Invest(/Learn),
+  or treat Access/Save/Invest/Learn as new top-level nav distinct from this section's tiles.
+- **Hero CTA conflicts with "don't lead with a waitlist CTA."** `components/sections/Hero.tsx`
+  currently has one CTA ("Get on the Bridge", `hero_cta_click`) which registers interest — the
+  brief wants two: "For Employees" / "For Employers".
+
+**Terminology already live in code that the brief requires removing (public-facing only — the
+in-app "Bridge ₦X" transaction label stays):**
+
+- "Bridgers" as a public audience label: `pages/register/EmployeeRegistration.tsx:60,89` (also
+  the `bridgers@getpaybridge.com` inbox address — flag for a call on whether to keep the alias
+  even after the public label changes), `components/admin/StatTiles.tsx:17`,
+  `pages/Privacy.tsx:29`, `components/registration/SegmentChooser.tsx:21`,
+  `components/sections/Footer.tsx:148`, `pages/Contact.tsx:84`.
+- "No documents" claim: `pages/register/EmployerRegistration.tsx:86`,
+  `components/registration/SegmentChooser.tsx:104` ("no documents, no credit checks, no
+  commitment") — replace with "Simple digital onboarding" per brief §12.
+
+**Ordered TODO (brief section → target):**
+
+1. ✅ Homepage hero copy + two-CTA split (brief §1, 2026-08-10) — `components/sections/Hero.tsx`:
+   eyebrow is now "Financial wellbeing, built around work.", headline "Life does not always wait
+   for payday.", body copy matches the brief verbatim, added the "For employees"/"For employers"
+   audience statement pair, and split the single CTA into "For Employees" (→
+   `/get-on-the-bridge/employee`) / "For Employers" (→ `/employers`) — both routes already
+   existed. New analytics events `hero_employee_cta_click`/`hero_employer_cta_click` added in
+   `lib/analytics.ts`, replacing the old single `hero_cta_click` on this button (still used
+   elsewhere, kept in the type). Typecheck passes.
+2. ✅ New "One payroll. No duplicate work." employer section (brief §2, 2026-08-10) — net-new
+   `components/sections/OnePayroll.tsx`, copy matches the brief verbatim including the "designed
+   to" hedge, wired into `pages/Index.tsx` right after `BeyondBridge` (pillars → employer
+   objection, matching the brief's desired flow order). Typecheck passes.
+3. ⬜ New 4-step "How PayBridge fits into payroll" section (brief §3) — net-new component.
+4. ⬜ New "Your PayBridge Account" product section (brief §4) — net-new component; never call it
+   an intermediate/collection account or virtual salary wallet in copy.
+5. ⬜ Access product copy — eligibility-gated language (brief §5).
+6. ⬜ Remove "Bridgers" as a public audience label (brief §6) — files listed above.
+7. ⬜ New HR privacy section, "sees only what it needs" framing (brief §7) — net-new component.
+8. ⬜ Employer admin copy — "does not require HR to approve every request" (brief §8) —
+   `components/sections/EmployerStory.tsx` or employer landing page.
+9. ⬜ Save copy — no fixed-return claims (brief §9) — `BeyondBridge.tsx` "Build" tile or a
+   dedicated Save page.
+10. ⬜ Invest copy — don't imply PayBridge is the fund manager (brief §10) — `BeyondBridge.tsx`
+    "Grow" tile or a dedicated Invest page.
+11. ⬜ Learn copy (brief §11) — no existing pillar/page; net-new.
+12. ⬜ Replace "No documents" language (brief §12) — files listed above.
+13. ⬜ Demote "From payroll to prosperity" to secondary use only (brief §13) — see tagline
+    conflict above; needs design sign-off since it's drawn into the logomark.
+14. ⬜ Employer value prop as four explicit benefits (brief §14) — `EmployerStory.tsx` or
+    employer landing page.
+15. ⬜ Sitewide scrub for forbidden claims (18% p.a., "works with every payroll provider",
+    "automatically deducts", "employer cannot see", "no credit assessment") — do this pass last,
+    after the sections above land, then grep the whole `webapp/src` tree.
+16. ⬜ Reorder homepage section flow to the brief's 11-step story (brief §16). Current order in
+    `webapp/src/pages/Index.tsx`: Hero → PaydayGap → BridgeIt → HowItWorks → WhoItServes →
+    BeyondBridge → EmployerStory → Manifesto → Trust → GetOnTheBridgeSection → Faqs.
+17. ⬜ Final QA: confirm the five core messages (brief "Core message" section) are legible within
+    two minutes of landing on the homepage.
