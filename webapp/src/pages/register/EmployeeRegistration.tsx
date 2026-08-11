@@ -20,7 +20,7 @@ import {
 } from "@/lib/registrations";
 
 /**
- * Employee registration — the Bridger waitlist.
+ * Employee registration — the early-interest form.
  *
  * The field list is deliberately short and deliberately harmless. There is no
  * BVN, NIN, bank statement, identity document, payslip or bank login here, and
@@ -57,7 +57,7 @@ const EmployeeRegistration = () => {
 
   return (
     <RegistrationLayout
-      label="For employees · Bridgers"
+      label="For employees"
       title="Get on the Bridge"
       intro="Join the early PayBridge community and be among the first to experience a more responsible connection between work, income and financial wellbeing."
       aside={
@@ -65,8 +65,8 @@ const EmployeeRegistration = () => {
           <>
             <AsideCard title="What happens next">
               <p>
-                We add you to the Bridger community and keep you informed as we prepare the first
-                pilot.
+                We add you to the PayBridge community and keep you informed as we prepare the
+                first pilot.
               </p>
               <p>
                 PayBridge activates through employers. When your organisation joins, you will be
@@ -90,7 +90,7 @@ const EmployeeRegistration = () => {
           body={
             <p>
               Thank you for joining the early PayBridge community. We'll keep you informed as we
-              prepare the first Bridger pilot.
+              prepare the first pilot.
             </p>
           }
           caveat="Registering today does not constitute approval or activation. Verification will only begin when your employer and PayBridge are ready to onboard your organisation securely."

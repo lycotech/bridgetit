@@ -18,7 +18,7 @@ export const SEGMENT_OPTIONS = [
     key: "employee" as const,
     icon: Briefcase,
     choice: "I am an Employee",
-    community: "Bridgers",
+    community: "Employees",
     to: "/get-on-the-bridge/employee",
     cta: "Get on the Bridge",
     blurb:
@@ -28,7 +28,7 @@ export const SEGMENT_OPTIONS = [
     key: "employer" as const,
     icon: Building2,
     choice: "I represent an Employer",
-    community: "Bridge Partners",
+    community: "Employers",
     to: "/employers",
     cta: "Bring PayBridge to your workforce",
     blurb:
@@ -38,7 +38,7 @@ export const SEGMENT_OPTIONS = [
     key: "capital_partner" as const,
     icon: Landmark,
     choice: "I am a Capital Partner",
-    community: "Bridge Capital Partners",
+    community: "Capital Partners",
     to: "/capital-partners",
     cta: "Register capital partnership interest",
     blurb:
@@ -101,7 +101,7 @@ export function SegmentChooser({ heading = true }: { heading?: boolean }) {
           <Reveal delay={0.1}>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">
               Choose the route that fits you. Each one takes a couple of minutes and registers your
-              interest only — no documents, no credit checks, no commitment.
+              interest only — simple digital onboarding, no credit checks, no commitment.
             </p>
           </Reveal>
         </div>

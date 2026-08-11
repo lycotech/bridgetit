@@ -42,6 +42,20 @@ export function EmployerStory() {
                 Support your people without turning payroll into an informal lending desk.
               </p>
             </Reveal>
+
+            <Reveal delay={0.18}>
+              <div className="mt-8 max-w-xl rounded-2xl border border-primary/30 bg-primary/5 p-6">
+                <p className="text-lg font-semibold text-foreground">
+                  PayBridge does not require HR to approve every employee request.
+                </p>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                  Eligibility and access limits operate within pre-agreed employer parameters and
+                  PayBridge risk controls. The objective is to reduce manual salary-advance
+                  requests rather than create another approval process for HR.
+                </p>
+              </div>
+            </Reveal>
+
             <Reveal delay={0.2}>
               <div className="mt-9 flex flex-wrap items-center gap-4">
                 {/* This section speaks to employers, so its CTA skips the

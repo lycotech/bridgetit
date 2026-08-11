@@ -14,8 +14,8 @@ export function StatTiles({
 }) {
   const tiles = [
     { key: "", label: "All registrations", value: stats?.total, icon: Users },
-    { key: "employee", label: "Bridgers", value: stats?.employee, icon: Users },
-    { key: "employer", label: "Bridge Partners", value: stats?.employer, icon: Building2 },
+    { key: "employee", label: "Employees", value: stats?.employee, icon: Users },
+    { key: "employer", label: "Employers", value: stats?.employer, icon: Building2 },
     { key: "capital_partner", label: "Capital Partners", value: stats?.capitalPartner, icon: Landmark },
     { key: "general", label: "General enquiries", value: stats?.general, icon: Mail },
   ];

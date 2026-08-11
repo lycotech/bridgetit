@@ -23,7 +23,7 @@ import {
 } from "@/lib/registrations";
 
 /**
- * Employer registration — Bridge Partners.
+ * Employer registration — the early-interest form.
  *
  * This form completes exactly one stage of the employer pilot pipeline:
  * "Interest Registered". Everything after it — qualification, discovery,
@@ -67,7 +67,7 @@ const EmployerRegistration = () => {
 
   return (
     <RegistrationLayout
-      label="For employers · Bridge Partners"
+      label="For employers"
       title="Bring PayBridge to Your Workforce"
       intro="Help your employees navigate financial pressure without turning your organisation into a lender. PayBridge connects responsible income access, payroll participation and financial wellbeing through a structured employer partnership."
       aside={
@@ -83,10 +83,11 @@ const EmployerRegistration = () => {
                 until an agreement is signed.
               </p>
             </AsideCard>
-            <AsideCard title="No documents yet" tone="caution">
+            <AsideCard title="Simple digital onboarding" tone="caution">
               <p>
                 We do not ask for incorporation documents, payroll files or bank details at this
-                stage — and we never request them by email.
+                stage — and we never request them by email. Company and payroll verification
+                happens digitally, through a secure channel, once a pilot is agreed.
               </p>
             </AsideCard>
           </>

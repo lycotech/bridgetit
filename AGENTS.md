@@ -193,11 +193,9 @@ swaps — need a product/design decision before implementing):
   `components/brand/Logo.tsx`, `components/brand/Tagline.tsx`, `components/brand/SectionLabel.tsx`,
   and `components/sections/Manifesto.tsx` (a whole section built around animating this phrase).
   This is a brand-design change, not a text edit.
-- **Pillar naming mismatch.** The brief says "Keep: Access. Save. Invest. Learn." as if it
-  already exists — it doesn't. The live homepage pillars in
-  `components/sections/BeyondBridge.tsx` are **Bridge / Build / Grow**, and there's no "Learn"
-  pillar anywhere yet. Needs a decision: rename Bridge/Build/Grow to Access/Save/Invest(/Learn),
-  or treat Access/Save/Invest/Learn as new top-level nav distinct from this section's tiles.
+- **Pillar naming mismatch — resolved (2026-08-11).** User decided: renamed
+  `components/sections/BeyondBridge.tsx`'s pillars Bridge/Build/Grow → Access/Save/Invest and
+  added a fourth Learn tile. See item 9-11 below for detail.
 - **Hero CTA conflicts with "don't lead with a waitlist CTA."** `components/sections/Hero.tsx`
   currently has one CTA ("Get on the Bridge", `hero_cta_click`) which registers interest — the
   brief wants two: "For Employees" / "For Employers".
@@ -232,19 +230,64 @@ in-app "Bridge ₦X" transaction label stays):**
    `components/sections/PayrollFit.tsx`, modeled on the existing `HowItWorks.tsx` timeline
    pattern (mobile vertical / desktop horizontal, final step marked as the outcome), wired into
    `pages/Index.tsx` right after `OnePayroll`. Typecheck passes.
-4. ⬜ New "Your PayBridge Account" product section (brief §4) — net-new component; never call it
-   an intermediate/collection account or virtual salary wallet in copy.
-5. ⬜ Access product copy — eligibility-gated language (brief §5).
-6. ⬜ Remove "Bridgers" as a public audience label (brief §6) — files listed above.
-7. ⬜ New HR privacy section, "sees only what it needs" framing (brief §7) — net-new component.
-8. ⬜ Employer admin copy — "does not require HR to approve every request" (brief §8) —
-   `components/sections/EmployerStory.tsx` or employer landing page.
-9. ⬜ Save copy — no fixed-return claims (brief §9) — `BeyondBridge.tsx` "Build" tile or a
-   dedicated Save page.
-10. ⬜ Invest copy — don't imply PayBridge is the fund manager (brief §10) — `BeyondBridge.tsx`
-    "Grow" tile or a dedicated Invest page.
-11. ⬜ Learn copy (brief §11) — no existing pillar/page; net-new.
-12. ⬜ Replace "No documents" language (brief §12) — files listed above.
+4. ✅ New "Your PayBridge Account" product section (brief §4, 2026-08-11) — net-new
+   `components/sections/PayBridgeAccount.tsx`, copy matches the brief verbatim (capabilities list
+   and a "you do not have to abandon your existing bank" callout), wired into `pages/Index.tsx`
+   right after `PayrollFit`. Typecheck passes.
+5. ✅ Access product copy (brief §5, 2026-08-11) — `components/sections/BridgeIt.tsx` was already
+   the Access pitch section ("bridge it"); updated headline to "Access what you have earned.
+   Responsibly.", body to the brief's wording, added the "subject to" list and the explicit
+   "Access is available only to eligible employees whose employer participates…" sentence so the
+   section stops implying universal/automatic access. Kept the existing Earned/Responsible/
+   Protected principle cards — they reinforce rather than conflict with the brief. Typecheck
+   passes.
+6. ✅ Remove "Bridgers" as a public audience label (brief §6, 2026-08-11) —
+   `pages/register/EmployeeRegistration.tsx`, `pages/register/EmployerRegistration.tsx` (a second
+   "Bridge Partners" instance turned up here that the original grep missed),
+   `components/admin/StatTiles.tsx`, `pages/Privacy.tsx`,
+   `components/registration/SegmentChooser.tsx`, `components/sections/Footer.tsx`,
+   `pages/Contact.tsx`. All now say Employees / Employers / Capital Partners. Judgment call: used
+   the term "Capital Partners" (already established elsewhere in-app — route `/capital-partners`,
+   `capital_partner` key) rather than introducing the brief's literal "Funding Partners", to avoid
+   a second, competing name for the same audience. The `bridgers@getpaybridge.com` mailbox itself
+   was left unchanged (it's a real configured address in `backend/src/email/identities.ts` and
+   `backend/.env.example` — renaming a live mail alias is an infra decision, not a copy edit); only
+   its visible label text changed. In-app "Bridge ₦X" transaction language is untouched, per the
+   brief. Typecheck passes.
+7. ✅ New HR privacy section (brief §7, 2026-08-11) — net-new `components/sections/HrPrivacy.tsx`,
+   a two-column "employers receive only what's needed for" vs. "always stays private" comparison,
+   wired into `pages/Index.tsx` right after `EmployerStory`. Deliberately does not say "your
+   employer sees nothing" per the brief. Distinct from the existing `Trust.tsx` section, which is
+   about product-mechanism trust (responsible-lending principles, security programme link), not
+   employer visibility — left that section untouched. Typecheck passes.
+8. ✅ Employer admin copy (brief §8, 2026-08-11) — `components/sections/EmployerStory.tsx`: added
+   a callout ("PayBridge does not require HR to approve every employee request." + the
+   pre-agreed-parameters/risk-controls supporting copy) between the existing "informal lending
+   desk" line and the CTA row. Typecheck passes.
+9. ✅ Save copy (brief §9, 2026-08-11) — no fixed-return claims. Resolved together with the
+   pillar-naming conflict below.
+10. ✅ Invest copy (brief §10, 2026-08-11) — doesn't imply PayBridge is the fund manager. Resolved
+    together with the pillar-naming conflict below.
+11. ✅ Learn copy (brief §11, 2026-08-11) — resolved together with the pillar-naming conflict below.
+
+   **Pillar-naming conflict resolved (user decision, 2026-08-11):** renamed
+   `components/sections/BeyondBridge.tsx`'s three pillars Bridge/Build/Grow → **Access/Save/
+   Invest**, and added a fourth **Learn** tile (new `GraduationCap` icon, `--protected` colour —
+   deliberately not `--primary-deep`, which the section's own design comment already rules out on
+   this dark background). Tile bodies now carry the brief's §9/§10/§11 substance, condensed to
+   fit the existing card format: Save mentions regulated partners, not a fixed return; Invest
+   attributes regulation to "appropriately regulated providers," not PayBridge itself; Learn
+   frames education around real employee decisions rather than generic "financial literacy."
+   Updated the section headline's first line ("Bridge today" → "Access today") so it doesn't
+   contradict the renamed pillars; kept "Build tomorrow" as ordinary prose (not a pillar name
+   reference). Typecheck passes.
+12. 🔶 Replace "No documents" language (brief §12) — partially done as a side effect of item 6
+    (2026-08-11): `pages/register/EmployerRegistration.tsx`'s "No documents yet" aside card is now
+    "Simple digital onboarding", with a line clarifying company/payroll verification happens later
+    through a secure channel. `components/registration/SegmentChooser.tsx`'s "no documents, no
+    credit checks, no commitment" also already reworded (see item 6). Still open: confirm no other
+    "No documents" instances remain sitewide (do a fresh grep before marking this ✅ — the original
+    audit for this item wasn't exhaustive, as item 6's cleanup already found one this list missed).
 13. ⬜ Demote "From payroll to prosperity" to secondary use only (brief §13) — see tagline
     conflict above; needs design sign-off since it's drawn into the logomark.
 14. ⬜ Employer value prop as four explicit benefits (brief §14) — `EmployerStory.tsx` or

@@ -26,7 +26,7 @@ const Privacy = () => (
 
     <LegalBlock heading="What we collect">
       <p>
-        It depends on which form you complete. Employees registering as Bridgers give us their name,
+        It depends on which form you complete. Employees registering with PayBridge give us their name,
         email address, phone number, state or city, employer name, employment type, an optional
         salary band and what they hope PayBridge will do for them. Employers give us company and
         contact details, industry, workforce size, payroll band, payroll provider and frequency,

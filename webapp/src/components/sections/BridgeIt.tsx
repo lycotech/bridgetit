@@ -29,20 +29,26 @@ export function BridgeIt() {
       <div className="relative mx-auto max-w-5xl px-5 text-center md:px-8">
         <Reveal>
           <div className="flex justify-center">
-            <SectionLabel>A new way to think about payday</SectionLabel>
+            <SectionLabel>PayBridge Access</SectionLabel>
           </div>
         </Reveal>
         <Reveal delay={0.05}>
           <h2 className="mx-auto mt-5 max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-foreground sm:text-6xl">
-            When life cannot wait,
+            Access what you have earned.
             <br />
-            <span className="text-primary">bridge it.</span>
+            <span className="text-primary">Responsibly.</span>
           </h2>
         </Reveal>
         <Reveal delay={0.1}>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-            PayBridge helps eligible employees use an approved portion of verified earnings already
-            accumulated through a structured employer-enabled programme.
+            PayBridge Access allows eligible employees to access an approved portion of verified
+            earned income before payday.
+          </p>
+        </Reveal>
+        <Reveal delay={0.12}>
+          <p className="mx-auto mt-4 max-w-xl text-sm text-muted-foreground">
+            Subject to employer participation, employee eligibility, verified earnings,
+            applicable limits, transparent charges and settlement arrangements.
           </p>
         </Reveal>
         <Reveal delay={0.14}>
@@ -68,6 +74,13 @@ export function BridgeIt() {
             </MDiv>
           ))}
         </StaggerGroup>
+
+        <Reveal delay={0.145}>
+          <p className="mx-auto mt-8 max-w-2xl text-sm text-muted-foreground">
+            Access is available only to eligible employees whose employer participates in
+            PayBridge and whose salary arrangement supports PayBridge settlement.
+          </p>
+        </Reveal>
 
         <Reveal delay={0.15}>
           <div className="mt-10 flex justify-center">

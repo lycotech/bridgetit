@@ -145,12 +145,12 @@ export function Footer() {
                   to="/get-on-the-bridge/employee"
                   className="text-foreground/80 transition-colors hover:text-primary"
                 >
-                  Employees · Bridgers
+                  Employees
                 </Link>
               </li>
               <li>
                 <Link to="/employers" className="text-foreground/80 transition-colors hover:text-primary">
-                  Employers · Bridge Partners
+                  Employers
                 </Link>
               </li>
               <li>

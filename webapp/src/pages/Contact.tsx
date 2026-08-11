@@ -81,7 +81,7 @@ const Contact = () => {
             </p>
             <p>
               Employer partnerships: partners@getpaybridge.com · Capital partnerships:
-              capital@getpaybridge.com · Bridger community: bridgers@getpaybridge.com
+              capital@getpaybridge.com · Employee community: bridgers@getpaybridge.com
             </p>
           </AsideCard>
 

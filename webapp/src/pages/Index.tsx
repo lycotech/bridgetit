@@ -8,7 +8,9 @@ import { WhoItServes } from "@/components/sections/WhoItServes";
 import { BeyondBridge } from "@/components/sections/BeyondBridge";
 import { OnePayroll } from "@/components/sections/OnePayroll";
 import { PayrollFit } from "@/components/sections/PayrollFit";
+import { PayBridgeAccount } from "@/components/sections/PayBridgeAccount";
 import { EmployerStory } from "@/components/sections/EmployerStory";
+import { HrPrivacy } from "@/components/sections/HrPrivacy";
 import { Manifesto } from "@/components/sections/Manifesto";
 import { Trust } from "@/components/sections/Trust";
 import { GetOnTheBridgeSection } from "@/components/sections/GetOnTheBridgeSection";
@@ -47,7 +49,9 @@ const Index = () => {
         <BeyondBridge />
         <OnePayroll />
         <PayrollFit />
+        <PayBridgeAccount />
         <EmployerStory />
+        <HrPrivacy />
         <Manifesto />
         <Trust />
         <GetOnTheBridgeSection />
