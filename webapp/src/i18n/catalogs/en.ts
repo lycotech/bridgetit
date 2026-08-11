@@ -90,7 +90,7 @@ export const en = {
   "bridge.success_body": "{amount} is going to your bank account now. {total} will be taken from your salary on {date}.",
   "bridge.confirm_understand": "I understand that {total} will be taken from my salary on {date}.",
   "bridge.not_free_money": "This is part of the salary you have already earned. It is not free money.",
-  "bridge.employer_cannot_see": "Your employer cannot see that you did this, or how much you asked for.",
+  "bridge.employer_cannot_see": "Your employer only sees what's needed to settle and reconcile payroll — not why you used this or how you spent it.",
 
   /* ----------------------------------------------------------- simple view */
   "simple.money_available": "Money available",

@@ -90,7 +90,7 @@ export const pcm: Catalog = {
   "bridge.success_body": "{amount} dey enter your bank account now. Dem go remove {total} from your salary on {date}.",
   "bridge.confirm_understand": "I understand say dem go remove {total} from my salary on {date}.",
   "bridge.not_free_money": "Dis na part of salary wey you don already work for. E no be free money.",
-  "bridge.employer_cannot_see": "Your oga no go see say you do dis, and e no go see how much you ask for.",
+  "bridge.employer_cannot_see": "Your oga only go see wetin dem need to settle and balance payroll — dem no go see why you use dis one or how you spend am.",
 
   /* ----------------------------------------------------------- simple view */
   "simple.money_available": "Money wey dey",

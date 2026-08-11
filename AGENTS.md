@@ -281,22 +281,57 @@ in-app "Bridge ₦X" transaction label stays):**
    Updated the section headline's first line ("Bridge today" → "Access today") so it doesn't
    contradict the renamed pillars; kept "Build tomorrow" as ordinary prose (not a pillar name
    reference). Typecheck passes.
-12. 🔶 Replace "No documents" language (brief §12) — partially done as a side effect of item 6
-    (2026-08-11): `pages/register/EmployerRegistration.tsx`'s "No documents yet" aside card is now
-    "Simple digital onboarding", with a line clarifying company/payroll verification happens later
-    through a secure channel. `components/registration/SegmentChooser.tsx`'s "no documents, no
-    credit checks, no commitment" also already reworded (see item 6). Still open: confirm no other
-    "No documents" instances remain sitewide (do a fresh grep before marking this ✅ — the original
-    audit for this item wasn't exhaustive, as item 6's cleanup already found one this list missed).
+12. ✅ Replace "No documents" language (brief §12, 2026-08-11) — done, mostly as a side effect of
+    item 6: `pages/register/EmployerRegistration.tsx`'s "No documents yet" card is now "Simple
+    digital onboarding" with a verification-happens-later line;
+    `components/registration/SegmentChooser.tsx`'s "no documents, no credit checks, no commitment"
+    reworded. Fresh sitewide grep for "no documents" (2026-08-11) turned up two more matches, both
+    reviewed and left as-is because they're unrelated functional empty-states, not onboarding
+    claims: `components/admin/portal/kyc/KycCaseDetail.tsx:144` ("No documents uploaded yet." —
+    an admin KYC case view saying a specific applicant hasn't uploaded anything) and
+    `pages/investor/Statements.tsx:122` ("No documents in this view" — a statements-list empty
+    state). Also checked `components/registration/fields.tsx`'s `NoDocumentsNotice` component —
+    its *name* contains the phrase but its rendered copy is already honest/hedged ("verification
+    happens later... once your employer activates PayBridge"); nothing user-facing to change.
 13. ⬜ Demote "From payroll to prosperity" to secondary use only (brief §13) — see tagline
     conflict above; needs design sign-off since it's drawn into the logomark.
-14. ⬜ Employer value prop as four explicit benefits (brief §14) — `EmployerStory.tsx` or
-    employer landing page.
-15. ⬜ Sitewide scrub for forbidden claims (18% p.a., "works with every payroll provider",
-    "automatically deducts", "employer cannot see", "no credit assessment") — do this pass last,
-    after the sections above land, then grep the whole `webapp/src` tree.
-16. ⬜ Reorder homepage section flow to the brief's 11-step story (brief §16). Current order in
-    `webapp/src/pages/Index.tsx`: Hero → PaydayGap → BridgeIt → HowItWorks → WhoItServes →
-    BeyondBridge → EmployerStory → Manifesto → Trust → GetOnTheBridgeSection → Faqs.
+14. ✅ Employer value prop as four explicit benefits (brief §14, 2026-08-11) — net-new
+    `components/sections/EmployerBenefits.tsx`, the brief's exact four benefits as icon cards,
+    wired into `pages/Index.tsx` right after `BeyondBridge` and before the sections that dive
+    deeper into each one (`OnePayroll`, `PayrollFit`, `PayBridgeAccount`, `EmployerStory`,
+    `HrPrivacy`), so it reads as the overview those sections then unpack. Typecheck passes.
+15. ✅ Sitewide scrub for forbidden claims (2026-08-11) — grepped `webapp/src` for 18%/fixed
+    returns, "works with every payroll provider," "automatically deducts/sweeps," "employer
+    cannot see," and "no credit assessment." Found and fixed one real violation:
+    `i18n/catalogs/en.ts:93` and the matching Pidgin string in `i18n/catalogs/pcm.ts:93` — the
+    `bridge.employer_cannot_see` translation key said "Your employer cannot see that you did
+    this, or how much you asked for," the exact forbidden claim, word for word. Reworded to match
+    `HrPrivacy.tsx`'s framing ("only sees what's needed to settle and reconcile payroll — not why
+    you used this or how you spent it"). Note: nothing in the current UI code calls this
+    translation key yet (only the two catalog files reference it), so this was latent, not live —
+    worth fixing now regardless, before whatever surfaces it ships. Everything else that matched
+    was reviewed and is already compliant or out of scope: `models.ts`/`mock-data.ts` already
+    hedge return language ("indicative only, never presented as guaranteed"), `Terms.tsx`
+    explicitly disclaims guaranteed returns, `operations/Portfolios.tsx`'s "expected return" is an
+    internal ops table-column caption, and `AccessibilityBrief.tsx`'s "employer cannot see this
+    panel" is a true architectural comment about a support-preferences feature with no employer
+    endpoint, not a public claim. Typecheck passes.
+16. ✅ Reorder homepage section flow (brief §16, 2026-08-11) — `webapp/src/pages/Index.tsx` now
+    reads: Hero → PaydayGap → WhoItServes → BeyondBridge → EmployerBenefits → OnePayroll →
+    PayBridgeAccount → BridgeIt → HowItWorks → PayrollFit → EmployerStory → HrPrivacy → Manifesto
+    → Trust → GetOnTheBridgeSection → Faqs. Maps directly to the brief's 11 beats (brand/core
+    proposition → pillars → employer objection → PayBridge Account → employee journey → employer
+    journey → privacy → CTA), with two judgment calls for the sections the brief's beat list
+    doesn't name: `WhoItServes` (audience overview) placed early, right after `PaydayGap`, as
+    orientation before the product detail starts rather than duplicating the segmented picker
+    that's already the final CTA (`GetOnTheBridgeSection`); `BridgeIt` (the Access product
+    deep-dive, brief §5, done in item 5) placed right after `PayBridgeAccount` and before
+    `HowItWorks`, grouped with the other employee-facing content rather than treated as a separate
+    beat. `Manifesto`/`Trust`/`GetOnTheBridgeSection`/`Faqs` were already in roughly the right
+    closing position and were left alone — `Manifesto` in particular is explicitly commented in
+    its own source as "the closing beat of the page" for the full tagline lockup, which is exactly
+    the item 13 tagline conflict still on hold. Nav anchor links (`#why`, `#how`, `#who`, `#trust`,
+    `#faqs`) scroll by ID and don't depend on document order, so the reorder doesn't break them.
+    Typecheck passes.
 17. ⬜ Final QA: confirm the five core messages (brief "Core message" section) are legible within
     two minutes of landing on the homepage.
