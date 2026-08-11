@@ -335,3 +335,55 @@ in-app "Bridge ₦X" transaction label stays):**
     Typecheck passes.
 17. ⬜ Final QA: confirm the five core messages (brief "Core message" section) are legible within
     two minutes of landing on the homepage.
+
+### Engineering dependencies this copy update exposes
+
+Cross-checked the finished copy work above against the rest of this file (§1-7) for places where
+the public site now promises something the backend doesn't do yet. Two kinds of finding: places
+copy is ahead of engineering (needs to stay honest/hedged until the gap closes), and one place
+copy is already fully backed by real code.
+
+1. **`components/sections/PayBridgeAccount.tsx` vs. no bank rail (§2 "Savings"/"Investments";
+   §3 "Funds disbursed"/"Repayment completed"; §6 punch-list item 8).** The section claims every
+   verified user "can receive a dedicated account... through our regulated banking infrastructure"
+   that funds savings/investments and supports Access settlement. Per §2, Savings and Investments
+   are explicitly ledger-only today — "no bank rail exists... a deposit/withdrawal is a
+   self-reported bookkeeping entry... not money PayBridge moved" — and per §3, "Funds disbursed" /
+   "Repayment completed" are both ❌ not built anywhere in the codebase (no Plaid/Paystack/
+   Flutterwave/Mono/Okra/Stripe/ACH integration exists). The copy itself is correctly hedged
+   ("can be used to," "where activated," never "is" or "does") so it doesn't violate the brief's
+   hard rules as written — but it is now the de facto public spec for the account feature. When
+   Disbursement/Repayment eventually comes off deferral (§6 item 8 — still gated on "a real
+   payment/banking integration decision first... a product conversation"), that build should be
+   checked against this exact copy rather than re-deriving requirements from scratch. Not
+   something to build now; flagging the dependency is the scope of this note.
+
+2. **`components/sections/OnePayroll.tsx` / `PayrollFit.tsx` vs. Repayments (§2 "Repayments" ❌;
+   §3 "Payroll deduction" ❌, "Repayment completed" ❌; §6 punch-list item 8).** These sections
+   promise PayBridge is "being designed to automate eligibility, settlement and reconciliation
+   within agreed employer rules," and the 4-step walkthrough ends with "the remaining salary can
+   be transferred to the employee's nominated everyday bank account." Per §2, "No route reconciles
+   a payroll deduction against a Bridge balance" — `employer/Repayments.tsx` and
+   `operations/Reconciliation.tsx` are still mock-service backed. Same shape as item 1: correctly
+   hedged copy ("designed to," "can be"), same underlying gap (Disbursement/Repayment, §6 item 8),
+   same recommendation — build against this copy when that work is unblocked, don't build it now.
+
+3. **`components/sections/HrPrivacy.tsx` vs. the same settlement/reconciliation gap.** The
+   "employers receive only what's needed for eligibility, payroll settlement, reconciliation,
+   programme administration" list names two things (payroll settlement, reconciliation) that
+   don't operationally exist yet, for the same reason as items 1-2. This one carries less risk
+   than 1-2 — it's phrased as a privacy *boundary* ("only what's needed for X"), not a claim that X
+   is happening today — but it's the same dependency, worth tracking alongside the other two so
+   all three get re-verified together once Disbursement/Repayment ships.
+
+**For contrast — a claim that's already fully backed by shipped code, no dependency:**
+`components/sections/EmployerStory.tsx`'s new callout, "PayBridge does not require HR to approve
+every employee request," is not aspirational. Per §2 ("Bridge Engine"), the engine already
+"decides instantly and deterministically — no per-draw manual review," built and wired
+2026-08-02. Included here so the pattern above reads as "copy ahead of engineering in these three
+specific, hedged places," not "the whole employer story is unbuilt."
+
+**Lower-priority, no action needed:** the `StatTiles.tsx` Bridgers→Employees rename (item 6 above)
+touched the real, live admin console, not a mock page, so it carries no dependency risk. None of
+today's new sections have test coverage, but that's the pre-existing repo-wide gap (§6 item 11:
+`risk.test.ts` is still the only test file), not something this update made worse.
