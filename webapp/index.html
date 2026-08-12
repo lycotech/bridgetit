@@ -17,6 +17,15 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/site.webmanifest" />
 
+  <!-- iOS "Add to Home Screen": Safari does not read display:standalone from the
+       manifest reliably on its own — without apple-mobile-web-app-capable the
+       installed icon can open as a normal Safari tab (URL bar and all) instead
+       of a standalone app window, and without apple-mobile-web-app-title the
+       home-screen label falls back to the full <title>, which is far too long. -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="PayBridge" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
   <!-- Open Graph -->
   <meta property="og:site_name" content="PayBridge" />
   <meta property="og:title" content="You Work Every Day. Why Wait Until Payday?" />
