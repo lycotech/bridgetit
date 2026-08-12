@@ -84,6 +84,23 @@ export const PORTAL_NAV: Record<Portal, NavSection[]> = {
       ],
     },
     {
+      label: "Payroll Setup",
+      items: [
+        {
+          to: "/employer/salary-account-requests",
+          label: "Salary Account Requests",
+          icon: ClipboardList,
+          permission: "employer.employees.manage",
+        },
+        {
+          to: "/employer/paybridge-payroll",
+          label: "PayBridge Payroll (optional)",
+          icon: Wallet,
+          permission: "employer.settings.manage",
+        },
+      ],
+    },
+    {
       label: "PayBridge Payroll",
       items: [
         { to: "/employer/payroll", label: "Command centre", icon: Gauge, end: true },

@@ -40,6 +40,7 @@ import type {
   Repayment,
   RiskAlert,
   Recommendation,
+  SalaryAccountRequest,
   SalaryBufferRequest,
   SavingsGoal,
   SavingsProduct,
@@ -91,6 +92,7 @@ const db = {
   bridgeRequests: [...seed.bridgeRequests],
   payrollRuns: [...seed.payrollRuns],
   buffers: [...seed.salaryBufferRequests],
+  salaryAccountRequests: [...seed.salaryAccountRequests],
   investors: [...seed.investors],
   portfolios: [...seed.portfolios],
   investments: [...seed.investments],
@@ -158,6 +160,8 @@ export const qk = {
   employeeStatements: (id: string) => ["employee", "statements", id] as const,
   employerOverview: (id: string) => ["employer", "overview", id] as const,
   employerEmployees: (id: string) => ["employer", "employees", id] as const,
+  employerSalaryAccountRequests: (id: string) => ["employer", "salary-account-requests", id] as const,
+  employerSalaryAccountRequest: (id: string) => ["employer", "salary-account-request", id] as const,
   employerPayroll: (id: string) => ["employer", "payroll", id] as const,
   employerBuffers: (id: string) => ["employer", "buffers", id] as const,
   employerActivity: (id: string) => ["employer", "activity", id] as const,
@@ -1044,6 +1048,10 @@ export const employerApi = {
       bridgeActivity: seed.employerBridgeActivity,
       upcomingRepayments: db.repayments.filter((r) => r.employerId === employerId),
       summary: bridgeSummaryFor(employerId),
+      salaryAccountsPending: db.salaryAccountRequests.filter((r) => {
+        const owner = db.employees.find((e) => e.id === r.employeeId);
+        return owner?.employerId === employerId && r.status === "pending_review";
+      }).length,
     });
   },
 
@@ -1090,6 +1098,60 @@ export const employerApi = {
       }
     });
     return delay(employeeIds.length, 600);
+  },
+
+  /** Which of the two payroll participation models this employer runs today. */
+  async setPayrollModel(employerId: string, model: Employer["payrollModel"]): Promise<Employer> {
+    const employer = employerById(employerId);
+    employer.payrollModel = model;
+    return delay(employer, 500);
+  },
+
+  /**
+   * Salary Account requests for Option A ("keep your payroll, add
+   * PayBridge"). Employer-scoped by matching the requesting employee's
+   * `employerId` — the same narrow, masked-only exception documented on
+   * `SalaryAccountRequest` in models.ts.
+   */
+  async salaryAccountRequests(employerId: string): Promise<SalaryAccountRequest[]> {
+    const employeeIds = new Set(db.employees.filter((e) => e.employerId === employerId).map((e) => e.id));
+    return delay(
+      db.salaryAccountRequests
+        .filter((r) => employeeIds.has(r.employeeId))
+        .sort((a, b) => +new Date(b.requestedAt) - +new Date(a.requestedAt)),
+    );
+  },
+
+  async salaryAccountRequest(employerId: string, id: string): Promise<SalaryAccountRequest> {
+    const employeeIds = new Set(db.employees.filter((e) => e.employerId === employerId).map((e) => e.id));
+    const request = db.salaryAccountRequests.find((r) => r.id === id && employeeIds.has(r.employeeId));
+    if (!request) return fail("Salary Account request not found");
+    return delay(request);
+  },
+
+  /**
+   * HR's whole action, per the brief: change one payroll field, nothing
+   * else. Approving does not move money or touch payroll calculation — it
+   * only updates the destination account this mock roster shows for this
+   * employee, exactly as a real payroll system's bank-detail field would be.
+   */
+  async decideSalaryAccountRequest(
+    id: string,
+    decision: "approved" | "rejected",
+    decidedBy: string,
+  ): Promise<SalaryAccountRequest> {
+    const request = db.salaryAccountRequests.find((r) => r.id === id);
+    if (!request) return fail("Salary Account request not found");
+    request.status = decision === "approved" ? "active" : "rejected";
+    request.decidedAt = new Date().toISOString();
+    request.decidedBy = decidedBy;
+    if (decision === "approved") {
+      const employer = db.employers.find((e) =>
+        db.employees.some((emp) => emp.id === request.employeeId && emp.employerId === e.id),
+      );
+      if (employer) employer.salaryAccountsActive += 1;
+    }
+    return delay(request, 700);
   },
 
   async payrollRuns(employerId: string): Promise<PayrollRun[]> {

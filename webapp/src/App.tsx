@@ -73,6 +73,9 @@ import PayrollExceptionsPage from "./pages/employer/payroll/Exceptions";
 import PayrollRecordsPage from "./pages/employer/payroll/Records";
 import PayrollIntegrationsPage from "./pages/employer/payroll/Integrations";
 import EmployerSalaryBufferPage from "./pages/employer/SalaryBuffer";
+import SalaryAccountRequestsPage from "./pages/employer/SalaryAccountRequests";
+import SalaryAccountRequestReviewPage from "./pages/employer/SalaryAccountRequestReview";
+import PayBridgePayrollPage from "./pages/employer/PayBridgePayroll";
 import EmployerBridgeActivityPage from "./pages/employer/BridgeActivity";
 import EmployerRepaymentsPage from "./pages/employer/Repayments";
 import EmployerReportsPage from "./pages/employer/Reports";
@@ -333,6 +336,30 @@ const App = () => (
                   element={
                     <RequirePermission permission="employer.employees.manage" moduleName="Employee records">
                       <EmployerEmployeesPage />
+                    </RequirePermission>
+                  }
+                />
+                <Route
+                  path="salary-account-requests"
+                  element={
+                    <RequirePermission permission="employer.employees.manage" moduleName="Salary Account requests">
+                      <SalaryAccountRequestsPage />
+                    </RequirePermission>
+                  }
+                />
+                <Route
+                  path="salary-account-requests/:id"
+                  element={
+                    <RequirePermission permission="employer.employees.manage" moduleName="Salary Account requests">
+                      <SalaryAccountRequestReviewPage />
+                    </RequirePermission>
+                  }
+                />
+                <Route
+                  path="paybridge-payroll"
+                  element={
+                    <RequirePermission permission="employer.settings.manage" moduleName="PayBridge Payroll">
+                      <PayBridgePayrollPage />
                     </RequirePermission>
                   }
                 />

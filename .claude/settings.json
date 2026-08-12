@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk 'NR==38{print length\\($0\\)}' AGENTS.md)"
+    ]
+  }
+}

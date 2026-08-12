@@ -35,7 +35,7 @@ PRD.md names 14 backend services. Here is what actually exists for each, in
 | **Admin** | ✅ Built | `admin.ts`, `admin-users.ts`, `admin-audit.ts`, `admin-invitations.ts`, `admin-support.ts` — registration/lead CRM, RBAC staff accounts, append-only audit log, CSV export, demo invitation lifecycle. Wired to real admin portal pages. |
 | **Notifications** | ⚠️ Partial | `email/mailer.ts` — real SMTP/Resend send with safe log-only dev fallback, wired into registration/verification/support/welcome flows. Email only — no SMS/push. Currently unconfigured in production (no `MAIL_TRANSPORT`/`SMTP_HOST`/`RESEND_API_KEY` set), so OTP/verification emails are silently not sent — see §5. |
 | **Risk & Compliance** | ✅ Wired (2026-08-01) | `backend/src/routes/admin-risk.ts` (`/api/admin/risk/*`) calls the untouched `eir/risk/*` engine for real: `backend/src/eir/scoring-input.ts` assembles a `ScoringInput` from actual `Employer`/`Director`/`BeneficialOwner`/`EmployerDocument`/`BankAccount`/`Consent`/`PayrollCycle`/`FinancialPeriod`/`EmployerUser` rows; `backend/src/eir/policy-store.ts` loads/seeds a `ScoringPolicyVersion` from `DEFAULT_POLICY`; `backend/src/eir/persist-score.ts` writes `EmployerScore`+`ScoreComponent`+`KnockoutEvaluation`+`LimitRecommendation` and updates `Employer.currentScore/currentTier/earlyWarningLevel`. A decision route resolves the engine's own authority matrix (`resolveAuthority`) and, on approval, sets `Employer.status = "active"` — the exact field the Eligibility Engine's `employerActive` check reads, so an approval now actually unblocks employees. Real UI at `/admin/risk` (needs `risk.view`/`risk.decide`, currently `super_admin` + `operations_admin` view-only). **Known, deliberate gaps** (see §3 and §6 below): the full 19-stage `eir/risk/workflow.ts` state machine is NOT enforced (a minimal `Application` row is auto-created only so `CreditDecision`'s required relation is satisfiable); `DEFAULT_POLICY`'s authority matrix ships with every threshold `null` (by the engine's own design — unconfigured means zero authority, not unlimited), so most decisions will correctly report "no authority configured" until a policy-editor screen exists to set real numbers; most `ScoringInput` fields (director identity verification, beneficial-owner/compliance screening, financial statements, behavioural history) have no capture flow anywhere in the product yet, so a fresh employer will score thin/low — that's the engine correctly reporting insufficient data, not a bug. |
-| **Employee Management** | ⚠️ Partial | Real: registration, KYC submission + document upload (`auth.ts`). Missing: no employer-side roster/eligibility management route — an employer cannot view or manage "their" employees for real. |
+| **Employee Management** | ✅ Built (2026-08-11, corrected from a stale "Missing: no employer-side roster" note) | Real: registration, KYC submission + document upload (`auth.ts`). Employer-side roster already existed as of 2026-08-01 (`GET /api/employer/payroll/employees`, real UI at `/employer-portal/payroll` — this file's own §2 Payroll Engine row just never cross-referenced it here). What was genuinely missing — eligibility, not the roster itself — is now built (2026-08-11): the roster endpoint joins each linked row's `User.kycStatus` and returns an employer-safe `kycApproved`/`eligible` per employee (same gate as `GET /api/auth/eligibility`, deliberately without the earned-wage amount or any draw history — that stays private, matching the public site's new `HrPrivacy.tsx` promise that employers get "only what's needed for eligibility"). Real UI: the Roster panel in `webapp/src/pages/employer-portal/Payroll.tsx` now shows "Eligible for Access" / "KYC pending" / "Not yet eligible" next to "Connected" for each linked employee. Not cURL-verified against a live database in this session (no reachable Postgres instance here) — verified by typecheck only (backend + webapp both clean); worth a real end-to-end check next time the app is run against Neon. |
 | **Employer Management** | ✅ Built (2026-08-01) | `backend/src/routes/employer.ts` (mounted at `/api/employer`) + `backend/src/security/employer-session.ts` — a real, separate multi-seat login for a company (`EmployerUser`, own session cookie, own `employer_admin`/`employer_contributor`/`employer_viewer` roles). Register creates a real `Employer` row. Company profile read/update, team list, invite-by-email (signed stateless token, no schema change needed), accept-invite, suspend/reinstate. Real frontend at `/employer-portal/{register,login,accept-invite}` and a minimal (not the polished mock dashboard) home page. **Not done**: this is NOT wired to the existing `/employer/*` demo dashboard (`webapp/src/pages/employer/*`), which is still 100% mock data behind the private demo gate — see the row below and §3. Connecting that dashboard to this real service is separate follow-up work. |
 | **Payroll Engine** | ✅ Built (2026-08-01) | `backend/src/routes/employer-payroll.ts` (mounted at `/api/employer/payroll`) — create a pay cycle, upload a CSV of pay records against it (re-upload replaces, doesn't duplicate), view cycle detail, view the derived employee roster. Real UI at `/employer-portal/payroll`. Names/account numbers encrypted at rest like KYC fields. Deliberately does NOT compute `timeliness`/delay days — that's `eir/risk/payroll.ts`'s job (§ Risk & Compliance, still unwired). No provider integration (ADP/Gusto) — manual/CSV only, which is what a pilot needs. |
 | **Eligibility Engine** | ✅ Built (2026-08-01) | `GET /api/auth/eligibility` (`backend/src/routes/employee-link.ts`) computes and returns every precondition from PRD.md's Business Rules that can be checked with data that now exists: employment verified, employer active, payroll verified, KYC approved — plus an honest prorated earned-wage-to-date estimate. Required a schema change: `EmployeeRecord.userId` (nullable, unique) now links a payroll roster row to the real `User` who claims it, via a signed invite-and-accept flow (`POST /api/employer/payroll/employees/:id/invite`, `POST /api/auth/link`) — mirrors the employer team-invite pattern, no new table needed. Real UI: an "Invite" button per unlinked roster row in `/employer-portal/payroll`, and a live "Bridge eligibility" panel on the customer's real `/account` page. **Does NOT decide a requested draw amount** — there is still no Bridge/draw model (see Bridge Engine, still not built); this only answers whether the preconditions for one are met today. |
@@ -387,3 +387,64 @@ specific, hedged places," not "the whole employer story is unbuilt."
 touched the real, live admin console, not a mock page, so it carries no dependency risk. None of
 today's new sections have test coverage, but that's the pre-existing repo-wide gap (§6 item 11:
 `risk.test.ts` is still the only test file), not something this update made worse.
+
+## 9. Employer Portal demo — Salary Account workflow (mock, 2026-08-12)
+
+A separate brief ("PayBridge Employer Portal — Demo Update Brief") asked for a demo showing
+employers they have two payroll participation options: keep their existing payroll and use a
+"PayBridge Salary Account" for participating employees (Option A), or run payroll fully through
+PayBridge (Option B). Explicitly scoped by the brief itself as demo/mock work — "do not implement
+real bank APIs... use realistic demo states and mock data" — so this targets the **mock**
+`webapp/src/pages/employer/*` dashboard (`mock-service.ts`/`mock-data.ts`), not the real,
+Postgres-backed `/employer-portal/*` built earlier in §2/§8. That scoping was confirmed with the
+user before building (a real fork in the road, same category of decision as the pillar-naming
+call in §8).
+
+**Built, all typecheck + lint clean:**
+
+- `lib/platform/models.ts` — new `PayrollModel` type + `Employer.payrollModel`/
+  `eligibleEmployees`/`salaryAccountsActive` fields; new `SalaryAccountRequest` type. Documented
+  as a **deliberate, narrow exception** to this file's existing "EMPLOYEE FINANCIAL PRIVACY —
+  no bank details" rule: masked (last-4) account numbers only, nothing else about an employee's
+  PayBridge activity attached. `EmployerOverview.salaryAccountsPending` added for the dashboard
+  metric.
+- `lib/platform/mock-data.ts` — demo employer gets `payrollModel: "existing_payroll"` (the
+  default/recommended option) and `salaryAccountsActive: 68`; 12 seeded `SalaryAccountRequest`
+  rows (8 `pending_review`, matching the brief's dashboard figure exactly, plus a few
+  active/rejected/suspended for table variety).
+- `lib/platform/mock-service.ts` — `employerApi.salaryAccountRequests`, `.salaryAccountRequest`,
+  `.decideSalaryAccountRequest` (approve moves straight to `active` per the brief's own worked
+  example in its item 7, not through an intermediate `approved` state), `.setPayrollModel`.
+- `components/employer/PayrollSetupCard.tsx` — the two-option card (brief item 1), wired into
+  `pages/employer/Overview.tsx` alongside a new 8-metric `StatGrid` (item 10: Workforce, Eligible,
+  Access Activated, Exposure, Salary Accounts Pending/Active, Next Payroll, Action Required — the
+  last linking straight to the requests queue when non-zero) and a standalone "Employee financial
+  privacy" panel (item 11, copy matches the brief verbatim).
+- `pages/employer/SalaryAccountRequests.tsx` (new route `/employer/salary-account-requests`) —
+  the requests table (item 2) plus the 6-stage "Existing Payroll Model" flow diagram (item 8).
+- `pages/employer/SalaryAccountRequestReview.tsx` (new route
+  `/employer/salary-account-requests/:id`) — combines items 3-7: the review screen, the employee's
+  authorization text + consent metadata, the Employer Protection Notice (with a visible "Subject
+  to Legal Review" tag, per the brief's own engineering note), the approve/reject confirm modal
+  (approve gated on an explicit "I confirm I am authorised..." checkbox), and the post-approval
+  "Salary Account Updated" confirmation state ending in "One payroll. Nothing else changes."
+- `pages/employer/PayBridgePayroll.tsx` (new route `/employer/paybridge-payroll`) — Option B (item
+  9), explicitly labeled **Optional** with an `InfoNote`, and a "switch back" action so nothing is
+  one-way in the demo.
+- `components/dashboard/navigation.ts` — new "Payroll Setup" sidebar section linking both new
+  routes; Salary Account Requests gated on `employer.employees.manage` (same permission as the
+  existing Employees page — the `employer_hr` role already holds it, matching the brief's own "HR
+  reviews the request" narrative), PayBridge Payroll gated on `employer.settings.manage`
+  (`employer_admin` only — switching the whole payroll model is a bigger call than approving one
+  request).
+
+**Deviated from the brief's literal text in one place, deliberately:** the brief's own review-
+screen example shows a full unmasked account number ("Account Number: 0123456789"); everywhere in
+this build shows only masked last-4 digits, consistent with how every other bank account in this
+codebase is displayed (`BankAccount.accountNumberMasked`) and with standard data-minimization
+practice. Judgment call, not asked before making it — low-risk, doesn't change any functional
+requirement.
+
+**Not done — items 12/13/14/15 of the brief are narrative/rules/constraints, not build items**
+(the demo script, the "do not build real X" list, language rules, the core demo message) — nothing
+to build for those, they're guidance the built screens above already follow.

@@ -374,22 +374,47 @@ payrollRouter.post("/cycles/:cycleId/upload", requireEmployerWriter(), async (c)
 
 /* =============================================================== ROSTER */
 
+/**
+ * Roster + eligibility, in one call. Deliberately the employer-safe subset of
+ * `computeEligibility` (bridge/eligibility.ts): whether each linked employee
+ * can use PayBridge Access today, never an earned-wage amount or draw
+ * history — that stays private per HrPrivacy's "only what's needed for
+ * eligibility" promise on the public site. `employerActive` and the active
+ * `ewa` CreditLimit are the same for the whole roster, so both are fetched
+ * once rather than per row.
+ */
 payrollRouter.get("/employees", async (c) => {
   const { employerId } = c.get("employerUser")!;
-  const rows = await prisma.employeeRecord.findMany({
-    where: { employerId, deletedAt: null },
-    orderBy: { staffRef: "asc" },
+
+  const [employer, activeLimit, rows] = await Promise.all([
+    prisma.employer.findUniqueOrThrow({ where: { id: employerId }, select: { status: true } }),
+    prisma.creditLimit.findFirst({ where: { employerId, product: "ewa", status: "active" } }),
+    prisma.employeeRecord.findMany({
+      where: { employerId, deletedAt: null },
+      orderBy: { staffRef: "asc" },
+      include: { user: { select: { kycStatus: true } } },
+    }),
+  ]);
+  const employerActive = employer.status === "active";
+  const ewaActive = activeLimit !== null;
+
+  const items: EmployeeRecordView[] = rows.map((r) => {
+    const kycApproved = r.user ? r.user.kycStatus === "approved" : null;
+    const employmentVerified = r.status === "active" && !r.exitedAt;
+    const eligible = r.user ? employmentVerified && employerActive && ewaActive && kycApproved === true : null;
+    return {
+      id: r.id,
+      staffRef: r.staffRef,
+      fullName: decryptField(r.fullNameEnc),
+      department: r.department,
+      jobTitle: r.jobTitle,
+      status: r.status,
+      ewaEnrolled: r.ewaEnrolled,
+      linked: r.userId !== null,
+      kycApproved,
+      eligible,
+    };
   });
-  const items: EmployeeRecordView[] = rows.map((r) => ({
-    id: r.id,
-    staffRef: r.staffRef,
-    fullName: decryptField(r.fullNameEnc),
-    department: r.department,
-    jobTitle: r.jobTitle,
-    status: r.status,
-    ewaEnrolled: r.ewaEnrolled,
-    linked: r.userId !== null,
-  }));
   return c.json({ data: { items } });
 });
 

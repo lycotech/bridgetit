@@ -206,6 +206,15 @@ export interface Transaction {
 
 /* ---------------------------------------------------------------- employer */
 
+/**
+ * The two ways an employer can participate — the whole point of the "will
+ * this create a second payroll?" objection this option pair exists to
+ * answer. `existing_payroll` (the default and recommended path) keeps the
+ * employer's own payroll as system of record; `paybridge_payroll` is the
+ * optional full-service alternative. See PayrollSetupCard.
+ */
+export type PayrollModel = "existing_payroll" | "paybridge_payroll";
+
 export interface Employer {
   id: string;
   name: string;
@@ -226,6 +235,14 @@ export interface Employer {
   payrollObligation: number;
   payrollFundsConfirmed: number;
   createdAt: string;
+  payrollModel: PayrollModel;
+  /** Employees whose eligibility checklist is fully satisfied — a subset of
+   *  activeEmployees. Distinct from employeesUsingBridge (eligible but not
+   *  necessarily activated). */
+  eligibleEmployees: number;
+  /** Salary Account requests currently approved and paying out — an
+   *  aggregate count, not enumerated per row (see SalaryAccountRequest). */
+  salaryAccountsActive: number;
 }
 
 export interface PayrollRun {
@@ -679,6 +696,39 @@ export interface EmployerEmployeeRecord {
   joinedAt: string;
 }
 
+export type SalaryAccountRequestStatus = "pending_review" | "approved" | "rejected" | "active" | "suspended";
+
+/**
+ * Option A ("keep your payroll, add PayBridge"): an employee has voluntarily
+ * asked their employer to redirect their salary-payment destination to a
+ * PayBridge Salary Account. This is the one deliberate, narrow exception to
+ * this file's "no bank details" rule above — HR needs to see which
+ * destination account it is approving, exactly as any payroll system already
+ * holds a destination account for every employee. Both accounts are masked
+ * to last four digits, never shown in full, and nothing else about the
+ * employee's PayBridge activity (why they enrolled, balances, usage) rides
+ * along with it.
+ */
+export interface SalaryAccountRequest {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  staffId: string;
+  currentBank: string;
+  currentAccountMasked: string;
+  newPartnerBank: string;
+  newAccountMasked: string;
+  requestedAt: string;
+  status: SalaryAccountRequestStatus;
+  decidedAt?: string;
+  decidedBy?: string;
+  consent: {
+    signedAt: string;
+    deviceRef: string;
+    consentReferenceId: string;
+  };
+}
+
 /**
  * One line per employee per payroll period: the amount to deduct and the
  * reference to settle against. No amount bridged, no dates, no frequency and
@@ -728,6 +778,7 @@ export interface EmployerOverview {
   bridgeActivity: SeriesPoint[];
   upcomingRepayments: Repayment[];
   summary: EmployerBridgeSummary;
+  salaryAccountsPending: number;
 }
 
 export interface InvestorOverview {

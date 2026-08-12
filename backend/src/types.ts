@@ -1032,6 +1032,12 @@ export const employeeRecordSchema = z.object({
   ewaEnrolled: z.boolean(),
   /** Whether a real customer account has claimed this payroll row. */
   linked: z.boolean(),
+  /** Null until linked — KYC lives on the User, not the payroll row. */
+  kycApproved: z.boolean().nullable(),
+  /** Same gate as GET /api/auth/eligibility, employer-safe subset: no
+   *  earned-wage amount, just whether this person can use PayBridge Access
+   *  today. Null until linked. */
+  eligible: z.boolean().nullable(),
 });
 export type EmployeeRecordView = z.infer<typeof employeeRecordSchema>;
 

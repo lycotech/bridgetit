@@ -31,6 +31,8 @@ import type {
   Repayment,
   RiskAlert,
   RiskLevel,
+  SalaryAccountRequest,
+  SalaryAccountRequestStatus,
   SalaryBufferRequest,
   SavingsGoal,
   SavingsProduct,
@@ -153,6 +155,9 @@ export const employers: Employer[] = EMPLOYER_SEEDS.map((seed, i) => {
     payrollObligation: obligation,
     payrollFundsConfirmed: round(obligation * confirmedRatio, 500_000),
     createdAt: iso(-int(40, 420)),
+    payrollModel: "existing_payroll",
+    eligibleEmployees: activeEmployees,
+    salaryAccountsActive: approved ? Math.round(activeEmployees * (0.2 + rng() * 0.1)) : 0,
   };
 });
 
@@ -166,6 +171,8 @@ demoEmployer.payrollObligation = 48_500_000;
 demoEmployer.payrollFundsConfirmed = 35_000_000;
 demoEmployer.approvedLimit = 24_000_000;
 demoEmployer.utilisedLimit = 9_400_000;
+demoEmployer.eligibleEmployees = 284;
+demoEmployer.salaryAccountsActive = 68;
 
 /* --------------------------------------------------------------- employees */
 
@@ -247,6 +254,56 @@ demoEmployee.bankAccounts = [
     isPrimary: false,
   },
 ];
+
+/* ------------------------------------------------------ salary accounts */
+
+const SALARY_ACCOUNT_PARTNER_BANK = "Providus Bank";
+
+/**
+ * Demo requests for the demo employer only (indices 0-21 in `employees`,
+ * per makeEmployee above). Eight pending — matching the dashboard's "Salary
+ * Accounts Pending" figure exactly — plus a few already decided, for table
+ * variety across every status the review screen needs to demonstrate.
+ */
+const SALARY_ACCOUNT_STATUSES: SalaryAccountRequestStatus[] = [
+  "pending_review",
+  "pending_review",
+  "pending_review",
+  "pending_review",
+  "pending_review",
+  "pending_review",
+  "pending_review",
+  "pending_review",
+  "active",
+  "active",
+  "rejected",
+  "suspended",
+];
+
+export const salaryAccountRequests: SalaryAccountRequest[] = SALARY_ACCOUNT_STATUSES.map((status, i) => {
+  const employee = employees[i];
+  const requestedAt = iso(-int(1, 21));
+  const decided = status !== "pending_review";
+  return {
+    id: `sar_${String(i + 1).padStart(3, "0")}`,
+    employeeId: employee.id,
+    employeeName: employee.fullName,
+    staffId: employee.staffId,
+    currentBank: employee.bankAccounts[0]?.bankName ?? pick(BANKS),
+    currentAccountMasked: employee.bankAccounts[0]?.accountNumberMasked ?? `•••• ${int(1000, 9999)}`,
+    newPartnerBank: SALARY_ACCOUNT_PARTNER_BANK,
+    newAccountMasked: `•••• ${int(1000, 9999)}`,
+    requestedAt,
+    status,
+    decidedAt: decided ? iso(-int(0, 6)) : undefined,
+    decidedBy: decided ? "HR administrator" : undefined,
+    consent: {
+      signedAt: requestedAt,
+      deviceRef: `iOS · Safari · ${pick(["Lagos", "Abuja", "Kaduna", "Port Harcourt"])}, NG`,
+      consentReferenceId: `CNS-${makeReference()}`,
+    },
+  };
+});
 
 /* ---------------------------------------------------------- bridge history */
 

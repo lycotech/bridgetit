@@ -67,6 +67,12 @@ export function dateTime(iso: string): string {
   return `${shortDate(iso)}, ${hh}:${mm}`;
 }
 
+/** "pending_review" -> "Pending review" — matches StatusBadge's existing tone keys exactly. */
+export function salaryAccountStatusLabel(status: string): string {
+  if (status === "pending_review") return "Pending review";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
 export function relativeTime(iso: string): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return iso;

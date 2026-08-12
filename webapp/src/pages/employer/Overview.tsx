@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { Building2, CalendarClock, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import { Building2, CalendarClock, ClipboardList, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { PageHeader, ActionButton } from "@/components/dashboard/PageHeader";
 import { Panel, ProgressMeter, SummaryRow, InfoNote, Divider } from "@/components/dashboard/Panel";
 import { StatCard, StatGrid } from "@/components/dashboard/StatCard";
 import { AsyncPanel } from "@/components/dashboard/states";
 import { TrendChart, ChartTabs, useChartRange, sliceSeries } from "@/components/dashboard/charts";
 import { StatusBadge, RiskPill } from "@/components/dashboard/StatusBadge";
+import { PayrollSetupCard } from "@/components/employer/PayrollSetupCard";
 import { employerApi, payrollApi, qk } from "@/lib/platform/mock-service";
 import { CycleTimeline } from "@/components/payroll/CycleTimeline";
 import { longDate, naira, nairaCompact, pct, shortDate, daysBetween } from "@/lib/platform/format";
@@ -50,6 +51,68 @@ export default function EmployerOverviewPage() {
 
           return (
             <div className="space-y-6">
+              <StatGrid columns={4}>
+                <StatCard
+                  label="Workforce"
+                  value={String(employer.employeeCount)}
+                  hint="Total employees on payroll"
+                  icon={<Users className="h-4 w-4" />}
+                />
+                <StatCard
+                  label="PayBridge Eligible"
+                  value={String(employer.eligibleEmployees)}
+                  hint="Meet every eligibility precondition"
+                />
+                <StatCard
+                  label="PayBridge Access Activated"
+                  value={String(employer.employeesUsingBridge)}
+                  hint="Have used Access at least once"
+                  tone="primary"
+                />
+                <StatCard
+                  label="Current Access Exposure"
+                  value={naira(employer.utilisedLimit)}
+                  hint={`of ${naira(employer.approvedLimit)} approved`}
+                  tone="protected"
+                />
+                <StatCard
+                  label="Salary Accounts Pending"
+                  value={String(data.salaryAccountsPending)}
+                  hint="Awaiting HR review"
+                  tone={data.salaryAccountsPending > 0 ? "attention" : "default"}
+                />
+                <StatCard
+                  label="Salary Accounts Active"
+                  value={String(employer.salaryAccountsActive)}
+                  hint="Currently paying to a PayBridge Salary Account"
+                  tone="success"
+                />
+                <StatCard
+                  label="Next Payroll"
+                  value={shortDate(employer.nextPayrollDate)}
+                  icon={<CalendarClock className="h-4 w-4" />}
+                />
+                <StatCard
+                  label="Employer Action Required"
+                  value={
+                    data.salaryAccountsPending > 0
+                      ? `${data.salaryAccountsPending} Salary Account Request${data.salaryAccountsPending === 1 ? "" : "s"}`
+                      : "All caught up"
+                  }
+                  tone={data.salaryAccountsPending > 0 ? "attention" : "protected"}
+                  icon={<ClipboardList className="h-4 w-4" />}
+                  footer={
+                    data.salaryAccountsPending > 0 ? (
+                      <ActionButton to="/employer/salary-account-requests" size="sm" variant="ghost">
+                        Review requests
+                      </ActionButton>
+                    ) : undefined
+                  }
+                />
+              </StatGrid>
+
+              <PayrollSetupCard payrollModel={employer.payrollModel} />
+
               <StatGrid columns={4}>
                 <StatCard
                   label="Payroll obligation"
@@ -238,6 +301,18 @@ export default function EmployerOverviewPage() {
                   </div>
                 </Panel>
               </div>
+
+              <Panel title="Employee financial privacy">
+                <p className="flex items-start gap-2 text-sm leading-relaxed text-foreground">
+                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                  Employers see only information required for eligibility, payroll administration,
+                  settlement and reconciliation.
+                </p>
+                <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
+                  Employers do not need access to the employee's reasons for using PayBridge,
+                  personal spending activity, savings choices or investment decisions.
+                </p>
+              </Panel>
             </div>
           );
         }}

@@ -224,11 +224,22 @@ export default function EmployerPortalPayroll() {
                     <p className="truncate text-xs text-muted-foreground">{e.staffRef}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <span
-                      className={`text-xs font-semibold uppercase tracking-wide ${e.linked ? "text-success" : "text-muted-foreground"}`}
-                    >
-                      {e.linked ? "Connected" : e.status}
-                    </span>
+                    {e.linked ? (
+                      <>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-success">Connected</span>
+                        <span
+                          className={`text-xs font-semibold uppercase tracking-wide ${
+                            e.eligible ? "text-success" : "text-muted-foreground"
+                          }`}
+                        >
+                          {e.eligible ? "Eligible for Access" : e.kycApproved === false ? "KYC pending" : "Not yet eligible"}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {e.status}
+                      </span>
+                    )}
                     {!e.linked && canWrite ? (
                       <ActionButton
                         variant="ghost"
