@@ -53,6 +53,9 @@ const STATUS_TONE: Record<string, Tone> = {
   "In progress": "progress",
   Submitted: "progress",
   Verified: "positive",
+  // referrals
+  Invited: "neutral",
+  Joined: "positive",
   // buffers
   Draft: "neutral",
   "Offer issued": "attention",

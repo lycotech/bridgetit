@@ -64,6 +64,7 @@ import EmployeeGrowPage from "./pages/employee/Grow";
 import EmployeeSavePage from "./pages/employee/Savings";
 import EmployeeInvestPage from "./pages/employee/Invest";
 import EmployeeProfilePage from "./pages/employee/Profile";
+import EmployeeReferPage from "./pages/employee/Refer";
 import EmployeeSupportPage from "./pages/employee/Support";
 import EmployerOverviewPage from "./pages/employer/Overview";
 import EmployerEmployeesPage from "./pages/employer/Employees";
@@ -309,6 +310,7 @@ const App = () => (
                 <Route path="grow" element={<EmployeeGrowPage />} />
                 {/* Wellbeing became Grow — keep old links working. */}
                 <Route path="wellbeing" element={<Navigate to="/employee/grow" replace />} />
+                <Route path="refer" element={<EmployeeReferPage />} />
                 <Route path="profile" element={<EmployeeProfilePage />} />
                 <Route path="support" element={<EmployeeSupportPage />} />
                 <Route path="*" element={<NotFoundInPortal home="/employee" />} />

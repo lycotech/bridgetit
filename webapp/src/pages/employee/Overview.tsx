@@ -3,13 +3,16 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
+  Copy,
   Gauge,
   HeartPulse,
   LineChart,
+  Landmark,
   PiggyBank,
   Sprout,
   Wallet,
 } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader, ActionButton } from "@/components/dashboard/PageHeader";
 import { StatCard, StatGrid } from "@/components/dashboard/StatCard";
 import { Panel, ProgressMeter, SegmentedMeter, SummaryRow, InfoNote } from "@/components/dashboard/Panel";
@@ -109,6 +112,62 @@ export default function EmployeeOverviewPage() {
                   icon={<HeartPulse className="h-4 w-4" />}
                 />
               </StatGrid>
+
+              <Panel
+                title="Your PayBridge Account"
+                description="Your own PayBridge-issued account number — share it to receive money directly."
+              >
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <Landmark className="h-5 w-5" />
+                  </span>
+                  <div className="grid flex-1 gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Bank
+                      </p>
+                      <p className="mt-0.5 text-sm font-semibold text-foreground">
+                        {data.employee.payBridgeAccount.bankName}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Account No
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void navigator.clipboard?.writeText(data.employee.payBridgeAccount.accountNumber);
+                          toast.success("Account number copied");
+                        }}
+                        className="mt-0.5 inline-flex items-center gap-1.5 text-sm font-semibold text-foreground tnum"
+                      >
+                        {data.employee.payBridgeAccount.accountNumber}
+                        <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Account Name
+                      </p>
+                      <p className="mt-0.5 text-sm font-semibold text-foreground">
+                        {data.employee.payBridgeAccount.accountName}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Credit score
+                      </p>
+                      <Link
+                        to="/employee/grow"
+                        className="mt-0.5 block text-sm font-semibold text-foreground hover:text-primary"
+                      >
+                        {data.employee.creditScore}
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </Panel>
 
               {data.accrual.paused ? (
                 <InfoNote tone="attention">

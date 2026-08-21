@@ -23,10 +23,12 @@ import type {
   KycStatus,
   LearningModule,
   Notification,
+  PayBridgeAccount,
   PayrollRun,
   PillarScore,
   Portfolio,
   Recommendation,
+  Referral,
   ReconciliationStatus,
   Repayment,
   RiskAlert,
@@ -107,6 +109,22 @@ function bankAccounts(seedName: string, count = 2): BankAccount[] {
     accountNumberMasked: `•••• ${int(1000, 9999)}`,
     isPrimary: i === 0,
   }));
+}
+
+/** Every employee's own PayBridge-issued account — distinct from the destination banks above. */
+const PAYBRIDGE_BANK_NAME = "PayBridge MFB";
+
+function paybridgeAccount(seedName: string, i: number): PayBridgeAccount {
+  const suffix = 1_000_000 + ((i * 7919) % 9_000_000);
+  return {
+    bankName: PAYBRIDGE_BANK_NAME,
+    accountNumber: `004${suffix}`,
+    accountName: seedName,
+  };
+}
+
+function referralCode(seedName: string, i: number): string {
+  return `${initialsOf(seedName)}${String(100 + i).padStart(3, "0")}`;
 }
 
 /* --------------------------------------------------------------- employers */
@@ -213,8 +231,11 @@ function makeEmployee(i: number): Employee {
     nextPayday: NEXT_PAYDAY,
     joinedAt: iso(-int(30, 900)),
     wellbeingScore: int(48, 92),
+    creditScore: int(300, 850),
     savingsAllocationPct: pick([0, 0, 5, 5, 10, 15]),
     bankAccounts: bankAccounts(name, 2),
+    payBridgeAccount: paybridgeAccount(name, i),
+    referralCode: referralCode(name, i),
   };
 }
 
@@ -237,7 +258,14 @@ demoEmployee.eligible = true;
 demoEmployee.eligibilityNote = undefined;
 demoEmployee.kycStatus = "Verified";
 demoEmployee.wellbeingScore = 74;
+demoEmployee.creditScore = 682;
 demoEmployee.savingsAllocationPct = 5;
+demoEmployee.payBridgeAccount = {
+  bankName: PAYBRIDGE_BANK_NAME,
+  accountNumber: "0040594321",
+  accountName: "Adaeze Okonkwo",
+};
+demoEmployee.referralCode = "PB-ADAEZE24";
 demoEmployee.bankAccounts = [
   {
     id: "ba_demo_primary",
@@ -1104,6 +1132,7 @@ export const savingsGoals: SavingsGoal[] = [
     productId: "sp_target",
     productName: "Goal Saver (Target)",
     interestEarned: 3_180,
+    startedAt: iso(-52),
   },
   {
     id: "sg_2",
@@ -1115,6 +1144,7 @@ export const savingsGoals: SavingsGoal[] = [
     productId: "sp_target",
     productName: "Goal Saver (Target)",
     interestEarned: 1_240,
+    startedAt: iso(-18),
   },
   {
     id: "sg_3",
@@ -1126,6 +1156,41 @@ export const savingsGoals: SavingsGoal[] = [
     productId: "sp_flex",
     productName: "Salary Buffer (Flexible)",
     interestEarned: 410,
+    startedAt: iso(-64),
+  },
+];
+
+/* ------------------------------------------------------------------ referrals */
+
+export const referrals: Referral[] = [
+  {
+    id: "rf_1",
+    employeeId: DEMO_EMPLOYEE_ID,
+    referredName: "Chidi Nwosu",
+    referredEmail: "chidi.nwosu@kadunafoods.com",
+    status: "Joined",
+    invitedAt: iso(-40),
+    joinedAt: iso(-33),
+    rewardAmount: 2_000,
+  },
+  {
+    id: "rf_2",
+    employeeId: DEMO_EMPLOYEE_ID,
+    referredName: "Ngozi Bello",
+    referredEmail: "ngozi.bello@kadunafoods.com",
+    status: "Joined",
+    invitedAt: iso(-29),
+    joinedAt: iso(-24),
+    rewardAmount: 2_000,
+  },
+  {
+    id: "rf_3",
+    employeeId: DEMO_EMPLOYEE_ID,
+    referredName: "Tunde Balogun",
+    referredEmail: "tunde.balogun@kadunafoods.com",
+    status: "Invited",
+    invitedAt: iso(-6),
+    rewardAmount: 2_000,
   },
 ];
 

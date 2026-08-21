@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDownToLine, ArrowUpRight, Plus, ShieldCheck, Sprout } from "lucide-react";
+import { ArrowDownToLine, ArrowUpRight, Gauge, Plus, ShieldCheck, Sprout } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, ActionButton } from "@/components/dashboard/PageHeader";
 import { Panel, ProgressMeter, SummaryRow, InfoNote, Divider } from "@/components/dashboard/Panel";
@@ -8,7 +8,7 @@ import { StatCard, StatGrid } from "@/components/dashboard/StatCard";
 import { EmptyState, LoadingPanel, ErrorState } from "@/components/dashboard/states";
 import { Modal } from "@/components/dashboard/Modal";
 import { MoneyField, SelectField, TextField } from "@/components/dashboard/forms";
-import { employeeApi, qk } from "@/lib/platform/mock-service";
+import { employeeApi, qk, savingsBridgeEligible } from "@/lib/platform/mock-service";
 import { longDate, naira } from "@/lib/platform/format";
 import { useAccountId } from "@/lib/platform/use-account";
 
@@ -27,6 +27,8 @@ export default function EmployeeSavePage() {
   const [productId, setProductId] = useState("");
   const [movement, setMovement] = useState<Movement | null>(null);
   const [movementAmount, setMovementAmount] = useState(0);
+  const [bridgeGoal, setBridgeGoal] = useState<{ goalId: string; goalName: string; eligible: number } | null>(null);
+  const [bridgeAmount, setBridgeAmount] = useState(0);
 
   const goals = useQuery({
     queryKey: qk.employeeSavings(employeeId),
@@ -35,6 +37,10 @@ export default function EmployeeSavePage() {
   const products = useQuery({
     queryKey: qk.employeeSavingsProducts(),
     queryFn: () => employeeApi.savingsProducts(),
+  });
+  const overview = useQuery({
+    queryKey: qk.employeeOverview(employeeId),
+    queryFn: () => employeeApi.overview(employeeId),
   });
 
   const openProducts = useMemo(
@@ -91,6 +97,28 @@ export default function EmployeeSavePage() {
       toast.success(movement?.direction === "in" ? "Money added" : "Money on its way to you");
       setMovement(null);
       setMovementAmount(0);
+    },
+    onError,
+  });
+
+  const bridgeFromSavings = useMutation({
+    mutationFn: () => {
+      if (!bridgeGoal) throw new Error("Nothing selected");
+      const account = overview.data?.employee.bankAccounts.find((a) => a.isPrimary) ?? overview.data?.employee.bankAccounts[0];
+      if (!account) throw new Error("Add a bank account first");
+      return employeeApi.bridgeFromSavings({
+        employeeId,
+        goalId: bridgeGoal.goalId,
+        amount: bridgeAmount,
+        bankAccountId: account.id,
+      });
+    },
+    onSuccess: () => {
+      invalidate();
+      void queryClient.invalidateQueries({ queryKey: qk.employeeRequests(employeeId) });
+      toast.success("Bridged from savings — on its way to your bank");
+      setBridgeGoal(null);
+      setBridgeAmount(0);
     },
     onError,
   });
@@ -161,6 +189,12 @@ export default function EmployeeSavePage() {
                 {goal.maturesAt ? (
                   <SummaryRow label="Matures" value={longDate(goal.maturesAt)} tone="muted" />
                 ) : null}
+                <SummaryRow
+                  label="Eligible to Bridge"
+                  value={naira(savingsBridgeEligible(goal))}
+                  hint="50% of savings held 30+ days, available today"
+                  tone={savingsBridgeEligible(goal) > 0 ? "primary" : "muted"}
+                />
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <ActionButton
@@ -183,6 +217,17 @@ export default function EmployeeSavePage() {
                 >
                   Withdraw
                 </ActionButton>
+                {savingsBridgeEligible(goal) > 0 ? (
+                  <ActionButton
+                    icon={<Gauge className="h-4 w-4" />}
+                    onClick={() => {
+                      setBridgeGoal({ goalId: goal.id, goalName: goal.name, eligible: savingsBridgeEligible(goal) });
+                      setBridgeAmount(savingsBridgeEligible(goal));
+                    }}
+                  >
+                    Bridge from savings
+                  </ActionButton>
+                ) : null}
               </div>
               <div className="mt-4">
                 <SelectField
@@ -356,6 +401,38 @@ export default function EmployeeSavePage() {
             max={movement?.direction === "out" ? movement.balance : undefined}
             quickAmounts={[5_000, 10_000, 25_000]}
             hint={movement ? `Plan balance ${naira(movement.balance)}` : undefined}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        open={bridgeGoal !== null}
+        onClose={() => setBridgeGoal(null)}
+        title={`Bridge from ${bridgeGoal?.goalName ?? ""}`}
+        description="Fee-free and instant — up to 50% of savings held 30 days or more, paid straight to your bank."
+        footer={
+          <>
+            <ActionButton variant="secondary" onClick={() => setBridgeGoal(null)}>
+              Cancel
+            </ActionButton>
+            <ActionButton
+              loading={bridgeFromSavings.isPending}
+              disabled={bridgeAmount <= 0 || (bridgeGoal ? bridgeAmount > bridgeGoal.eligible : true)}
+              onClick={() => bridgeFromSavings.mutate()}
+            >
+              Bridge It
+            </ActionButton>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <MoneyField
+            label="Amount"
+            value={bridgeAmount}
+            onChange={setBridgeAmount}
+            max={bridgeGoal?.eligible}
+            quickAmounts={bridgeGoal ? [Math.round(bridgeGoal.eligible / 2), bridgeGoal.eligible] : []}
+            hint={bridgeGoal ? `Eligible today: ${naira(bridgeGoal.eligible)}` : undefined}
           />
         </div>
       </Modal>

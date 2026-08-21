@@ -40,6 +40,7 @@ import type {
   Repayment,
   RiskAlert,
   Recommendation,
+  Referral,
   SalaryAccountRequest,
   SalaryBufferRequest,
   SavingsGoal,
@@ -106,6 +107,7 @@ const db = {
   statements: [...seed.statements],
   notifications: [...seed.notifications],
   savings: [...seed.savingsGoals],
+  referrals: [...seed.referrals],
   payrollRecords: payrollSeed.payrollRecords.map((r) => ({ ...r, deductions: [...r.deductions] })),
   payrollPeriods: payrollSeed.payrollPeriods.map((p) => ({ ...p })),
   payrollPolicies: payrollSeed.payrollPolicies.map((p) => ({ ...p })),
@@ -152,6 +154,7 @@ export const qk = {
   employeeRequest: (ref: string) => ["employee", "request", ref] as const,
   employeeBanks: (id: string) => ["employee", "banks", id] as const,
   employeeSavings: (id: string) => ["employee", "savings", id] as const,
+  employeeReferrals: (id: string) => ["employee", "referrals", id] as const,
   employeeSavingsProducts: () => ["employee", "savings-products"] as const,
   employeeInvestProducts: () => ["employee", "invest-products"] as const,
   employeeHoldings: (id: string) => ["employee", "holdings", id] as const,
@@ -507,6 +510,11 @@ function byBridgeReduction(a: Recommendation, b: Recommendation): number {
 function savingsTotal(): number {
   return db.savings.reduce((sum, goal) => sum + goal.balance, 0);
 }
+/** Half of a savings goal's balance becomes Bridge-eligible once it has been held 30+ days. */
+export function savingsBridgeEligible(goal: SavingsGoal): number {
+  if (daysBetween(goal.startedAt, new Date().toISOString()) < 30) return 0;
+  return Math.floor(goal.balance * 0.5);
+}
 function investedTotal(): number {
   return db.holdings.reduce((sum, holding) => sum + holding.value, 0);
 }
@@ -837,6 +845,7 @@ export const employeeApi = {
       maturesAt: product.tenorDays
         ? new Date(Date.now() + product.tenorDays * 86_400_000).toISOString()
         : undefined,
+      startedAt: new Date().toISOString(),
     };
     db.savings.push(goal);
     return delay(goal, 600);
@@ -874,6 +883,109 @@ export const employeeApi = {
     }
     goal.balance -= amount;
     return delay(db.savings, 700);
+  },
+
+  /**
+   * Bridge against savings held 30+ days — up to 50% of that goal's balance,
+   * paid out immediately since it is the employee's own money, not an advance
+   * against unearned payroll (so it does not touch `accrual.availableToBridge`).
+   */
+  async bridgeFromSavings(input: {
+    employeeId: string;
+    goalId: string;
+    amount: number;
+    bankAccountId: string;
+  }): Promise<{ savings: SavingsGoal[]; request: BridgeRequest }> {
+    const employee = employeeById(input.employeeId);
+    const goal = db.savings.find((g) => g.id === input.goalId) ?? fail("Savings plan not found");
+    const eligible = savingsBridgeEligible(goal);
+    if (eligible <= 0) fail(`${goal.name} becomes Bridge-eligible 30 days after you start saving.`);
+    if (input.amount <= 0) fail("Enter an amount to bridge");
+    if (input.amount > eligible) {
+      fail(`You can Bridge up to ${naira(eligible)} of ${goal.name} today.`);
+    }
+    const account =
+      employee.bankAccounts.find((a) => a.id === input.bankAccountId) ?? employee.bankAccounts[0];
+    goal.balance -= input.amount;
+    const now = new Date().toISOString();
+    const request: BridgeRequest = {
+      id: `br_${Date.now()}`,
+      reference: makeReference("PB-SV"),
+      employeeId: employee.id,
+      employeeName: employee.fullName,
+      employerId: employee.employerId,
+      employerName: employee.employerName,
+      amount: input.amount,
+      fee: 0,
+      netAmount: input.amount,
+      settlementAmount: input.amount,
+      status: "Disbursed",
+      bankAccountId: account.id,
+      destination: `${account.bankName} ${account.accountNumberMasked}`,
+      createdAt: now,
+      disbursedAt: now,
+      settlementDate: now,
+      timeline: [
+        { label: "Request initiated", at: now, state: "done" },
+        { label: `Released from ${goal.name}`, at: now, state: "done" },
+        { label: "Disbursed to your bank", at: now, state: "done" },
+      ],
+    };
+    db.bridgeRequests.unshift(request);
+    db.transactions.unshift({
+      id: `tx_${request.id}`,
+      reference: request.reference,
+      type: "Bridge",
+      counterparty: employee.fullName,
+      employerName: employee.employerName,
+      amount: request.amount,
+      fee: 0,
+      status: request.status,
+      channel: "NIP transfer",
+      createdAt: now,
+      reconciliation: "Unmatched",
+    });
+    db.notifications.unshift({
+      id: `nt_${Date.now()}`,
+      portal: "employee",
+      tone: "success",
+      title: `${naira(request.netAmount)} on the way`,
+      body: `Bridged from ${goal.name} to ${request.destination}.`,
+      at: now,
+      read: false,
+    });
+    logAudit(employee.fullName, "Employee", `Bridged ${naira(input.amount)} from savings (${goal.name})`, "Bridge request");
+    return delay({ savings: db.savings, request }, 800);
+  },
+
+  /* --------------------------------------------------------------- Refer */
+
+  async referrals(employeeId: string): Promise<Referral[]> {
+    return delay(
+      db.referrals
+        .filter((r) => r.employeeId === employeeId)
+        .sort((a, b) => +new Date(b.invitedAt) - +new Date(a.invitedAt)),
+    );
+  },
+
+  async sendReferral(input: { employeeId: string; name: string; email: string }): Promise<Referral> {
+    const employee = employeeById(input.employeeId);
+    if (!input.name.trim()) fail("Enter their name");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)) fail("Enter a valid email address");
+    if (db.referrals.some((r) => r.employeeId === input.employeeId && r.referredEmail === input.email)) {
+      fail("You have already referred this person");
+    }
+    const referral: Referral = {
+      id: `rf_${Date.now()}`,
+      employeeId: employee.id,
+      referredName: input.name.trim(),
+      referredEmail: input.email.trim(),
+      status: "Invited",
+      invitedAt: new Date().toISOString(),
+      rewardAmount: 2_000,
+    };
+    db.referrals.unshift(referral);
+    return delay(referral, 600);
   },
 
   /* ------------------------------------------------------------- Invest */

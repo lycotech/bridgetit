@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, Landmark, Plus, Star } from "lucide-react";
+import { BadgeCheck, Copy, Landmark, Plus, Star } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, ActionButton } from "@/components/dashboard/PageHeader";
 import { Panel, SummaryRow, InfoNote } from "@/components/dashboard/Panel";
@@ -120,6 +120,32 @@ export default function EmployeeProfilePage() {
             </Panel>
 
             <div className="space-y-6">
+              <Panel
+                title="Your PayBridge Account"
+                description="Issued to you by PayBridge — separate from the personal banks below."
+              >
+                <div className="divide-y divide-border/70">
+                  <SummaryRow label="Bank" value={data.employee.payBridgeAccount.bankName} />
+                  <SummaryRow
+                    label="Account No"
+                    value={
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void navigator.clipboard?.writeText(data.employee.payBridgeAccount.accountNumber);
+                          toast.success("Account number copied");
+                        }}
+                        className="inline-flex items-center gap-1.5 font-semibold text-foreground"
+                      >
+                        {data.employee.payBridgeAccount.accountNumber}
+                        <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                    }
+                  />
+                  <SummaryRow label="Account Name" value={data.employee.payBridgeAccount.accountName} />
+                </div>
+              </Panel>
+
               <Panel
                 title="Bank accounts"
                 description="Choose where your Bridge lands."

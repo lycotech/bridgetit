@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { BookOpen, Check, HeartPulse, Lightbulb, Sparkles, X } from "lucide-react";
+import { BookOpen, Check, Gauge, HeartPulse, Lightbulb, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { ActionButton } from "@/components/dashboard/PageHeader";
@@ -20,6 +20,14 @@ const PILLAR_TONE: Record<Pillar, "primary" | "available" | "protected" | "gold"
   Grow: "gold",
 };
 
+/** Demo internal score, 300-850 — not a bureau-reported credit score. */
+function creditScoreBand(score: number): string {
+  if (score >= 750) return "Excellent";
+  if (score >= 650) return "Good";
+  if (score >= 550) return "Fair";
+  return "Building";
+}
+
 export default function EmployeeGrowPage() {
   const employeeId = useAccountId("employee");
   const queryClient = useQueryClient();
@@ -31,6 +39,10 @@ export default function EmployeeGrowPage() {
   const pattern = useQuery({
     queryKey: ["employee", "spend-pattern"],
     queryFn: () => employeeApi.spendPattern(),
+  });
+  const overview = useQuery({
+    queryKey: qk.employeeOverview(employeeId),
+    queryFn: () => employeeApi.overview(employeeId),
   });
 
   const invalidate = () => {
@@ -62,13 +74,20 @@ export default function EmployeeGrowPage() {
       <AsyncPanel query={report}>
         {(data) => (
           <div className="space-y-6">
-            <StatGrid columns={3}>
+            <StatGrid columns={4}>
               <StatCard
                 label="Wellbeing score"
                 value={`${data.score}/100`}
                 hint={`${data.band} — across Bridge, Save, Invest and Grow`}
                 tone="primary"
                 icon={<HeartPulse className="h-4 w-4" />}
+              />
+              <StatCard
+                label="Credit score"
+                value={overview.data ? `${overview.data.employee.creditScore}` : "—"}
+                hint={overview.data ? `${creditScoreBand(overview.data.employee.creditScore)} · PayBridge internal score` : "Loading"}
+                tone="success"
+                icon={<Gauge className="h-4 w-4" />}
               />
               <StatCard
                 label="Service fees avoided"

@@ -132,6 +132,13 @@ export interface BankAccount {
   isPrimary: boolean;
 }
 
+/** The employee's own PayBridge-issued account — not a destination bank they added themselves. */
+export interface PayBridgeAccount {
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+}
+
 export interface Employee {
   id: string;
   fullName: string;
@@ -155,8 +162,12 @@ export interface Employee {
   nextPayday: string;
   joinedAt: string;
   wellbeingScore: number;
+  /** Demo internal credit score (300-850 scale), separate from wellbeingScore. */
+  creditScore: number;
   savingsAllocationPct: number;
   bankAccounts: BankAccount[];
+  payBridgeAccount: PayBridgeAccount;
+  referralCode: string;
 }
 
 export interface BridgeRequest {
@@ -520,6 +531,23 @@ export interface SavingsGoal {
   productName?: string;
   interestEarned?: number;
   maturesAt?: string;
+  /** When this goal started building — savings held 30+ days from this date become Bridge-eligible. */
+  startedAt: string;
+}
+
+/* ------------------------------------------------------------------ referrals */
+
+export type ReferralStatus = "Invited" | "Joined";
+
+export interface Referral {
+  id: string;
+  employeeId: string;
+  referredName: string;
+  referredEmail: string;
+  status: ReferralStatus;
+  invitedAt: string;
+  joinedAt?: string;
+  rewardAmount: number;
 }
 
 /* --------------------------------------------------- financial wellbeing */

@@ -448,3 +448,55 @@ requirement.
 **Not done — items 12/13/14/15 of the brief are narrative/rules/constraints, not build items**
 (the demo script, the "do not build real X" list, language rules, the core demo message) — nothing
 to build for those, they're guidance the built screens above already follow.
+
+## 10. Employee demo dashboard — Account, Refer, Save-to-Bridge, Credit score (mock, 2026-08-20)
+
+A brief asked for four additions to the employee side of the demo: a per-employee PayBridge
+account, a referral system, the ability to Bridge 50% of savings held 30+ days, and a credit
+score. Scoped to the **mock** `webapp/src/pages/employee/*` dashboard (`mock-service.ts`/
+`mock-data.ts`), same as §9 — the real `/account` page (§2) is untouched. A fifth item, "employee
+can register directly" (self-serve signup bypassing the invite-code gate), was explicitly
+descoped by the user rather than built — the demo stays invite-only.
+
+**Built, all typecheck + lint clean:**
+
+- `lib/platform/models.ts` — new `PayBridgeAccount` (bankName/accountNumber/accountName) and
+  `Referral`/`ReferralStatus` types; `Employee` gained `payBridgeAccount`, `creditScore` (300-850,
+  a demo-internal score, deliberately separate from the existing `wellbeingScore`), and
+  `referralCode`; `SavingsGoal` gained `startedAt` (when 30-day Bridge eligibility starts
+  counting).
+- `lib/platform/mock-data.ts` — every seeded employee gets a deterministic PayBridge account
+  number (`004` + 7 digits) and referral code; the demo employee's account is `PayBridge MFB ·
+  0040594321 · Adaeze Okonkwo` (matches the brief's own example format). New `referrals` export
+  (3 seeded rows, 2 Joined + 1 Invited) and `startedAt` on the 3 seeded savings goals (2 past the
+  30-day mark, 1 not yet).
+- `lib/platform/mock-service.ts` — `savingsBridgeEligible(goal)` (exported helper: 50% of balance
+  once `daysBetween(startedAt, now) >= 30`, else 0), `employeeApi.bridgeFromSavings` (fee-free,
+  instant `BridgeRequest` sourced from a savings goal — does not touch payroll-based
+  `accrual.availableToBridge`, a deliberately separate lane), `employeeApi.referrals` /
+  `.sendReferral`.
+- UI: "Your PayBridge Account" panel on `Overview.tsx` (dashboard home, includes credit score) and
+  `Profile.tsx`, both with copy-to-clipboard on the account number, following the existing
+  Bridge.tsx reference-copy pattern. Credit score also gets a full `StatCard` + band
+  (Excellent/Good/Fair/Building) on `Grow.tsx`, next to the existing wellbeing score — labeled
+  "PayBridge internal score" to avoid implying a bureau-reported score. New `pages/employee/
+  Refer.tsx` (route `/employee/refer`, nav item "Refer & Earn" under "Your money") — referral code
+  with copy, an invite form (name + email), and a list of past referrals with reward earned.
+  `Savings.tsx` — each goal panel now shows "Eligible to Bridge" and, when eligible, a "Bridge from
+  savings" button opening a dedicated modal capped at the 50% figure.
+- `components/dashboard/StatusBadge.tsx` — added `Invited`/`Joined` tones (neutral/positive) to
+  the shared status-color map, matching the pattern already used for every other status in the
+  app rather than a one-off badge in the new page.
+
+**Naming:** every screen calls it "PayBridge Account" per the brand rule in the project's
+CLAUDE.md (never "virtual account"/"virtual salary wallet" in user-facing copy) — the user's own
+request used "virtual account" only as a description of the feature, not as label text.
+
+**Verification note:** this session had no browser available to click through the pages — verified
+by `npx tsc --noEmit -p tsconfig.app.json` (the root `tsconfig.json` is a project-reference shell
+with `"files": []` and checks nothing on its own — use `tsconfig.app.json` directly) and `eslint`
+on every touched file. Both clean for this work; `tsc` reports 7 pre-existing errors elsewhere in
+the codebase (`TwoFactorPanel.tsx`, `CreditRisk.tsx`, `Reports.tsx`, `employer-portal/Home.tsx`,
+`employer-portal/Payroll.tsx`, one `makeReference()` call in `mock-data.ts`) that predate this
+session and were not touched by it. Worth a real click-through next time the app is run, and worth
+fixing that pre-existing baseline separately.

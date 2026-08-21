@@ -16,6 +16,7 @@ import {
   Scale,
   Settings,
   ShieldAlert,
+  Share2,
   Sprout,
   Upload,
   UserCog,
@@ -57,6 +58,7 @@ export const PORTAL_NAV: Record<Portal, NavSection[]> = {
         { to: "/employee/savings", label: "Save", icon: Sprout },
         { to: "/employee/invest", label: "Invest", icon: LineChart },
         { to: "/employee/grow", label: "Grow", icon: HeartPulse },
+        { to: "/employee/refer", label: "Refer & Earn", icon: Share2 },
       ],
     },
     {
