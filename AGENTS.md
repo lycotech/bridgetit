@@ -487,6 +487,13 @@ descoped by the user rather than built — the demo stays invite-only.
 - `components/dashboard/StatusBadge.tsx` — added `Invited`/`Joined` tones (neutral/positive) to
   the shared status-color map, matching the pattern already used for every other status in the
   app rather than a one-off badge in the new page.
+- `components/employee/AIAssistWidget.tsx` (2026-08-21 follow-up) — floating "AI Assist" button on
+  `Overview.tsx`, opening a `Modal` that suggests saving part of `remainingAvailable` (unused
+  earned pay) and projects interest at 3/6/12 months using whichever open savings product's real
+  `ratePct` the chosen amount qualifies for. Explicitly documented in the component's own comment
+  as rules-based, not a live AI call — everything shown is computed from the employee's own
+  overview numbers and the existing product rates, same honesty bar as `Savings.tsx`, with the
+  same "illustrative, not a guaranteed return" disclosure the products already carry.
 
 **Naming:** every screen calls it "PayBridge Account" per the brand rule in the project's
 CLAUDE.md (never "virtual account"/"virtual salary wallet" in user-facing copy) — the user's own

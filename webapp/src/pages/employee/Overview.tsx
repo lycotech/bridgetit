@@ -25,6 +25,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { usePreferences } from "@/lib/prefs/PreferencesProvider";
 import { SimpleHome } from "@/components/employee/SimpleHome";
 import { FirstUseOnboarding } from "@/components/prefs/FirstUseOnboarding";
+import { AIAssistWidget } from "@/components/employee/AIAssistWidget";
 
 export default function EmployeeOverviewPage() {
   const employeeId = useAccountId("employee");
@@ -474,6 +475,7 @@ export default function EmployeeOverviewPage() {
           )}
         </AsyncPanel>
       )}
+      <AIAssistWidget />
     </div>
   );
 }
