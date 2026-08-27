@@ -14,14 +14,21 @@ import type {
   InvestmentCommitmentView,
   KycStatusView,
   KycSubmissionInput,
+  PayBridgeAccountView,
+  PayBridgeScoreView,
   PortfolioSnapshotView,
   RegisterAccountInput,
+  ReferralSummaryView,
+  ReferralView,
   RequestBridgeDrawInput,
   RequestSalaryAccountInput,
+  RequestSavingsBridgeInput,
   SalaryAccountRequestView,
+  SavingsBridgeDrawView,
   SavingsGoalView,
   SavingsTransactionInput,
   SavingsTransactionView,
+  SendReferralInput,
   SessionGate,
   SessionState,
   SignInInput,
@@ -349,6 +356,58 @@ export function useLinkEmployer() {
   return useMutation({
     mutationFn: (input: AcceptEmployeeLinkInput) => api.post<{ linked: boolean }>("/api/auth/link", input),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["account", "eligibility"] }),
+  });
+}
+
+export function usePayBridgeAccount(enabled: boolean) {
+  return useQuery({
+    queryKey: ["account", "paybridge-account"] as const,
+    queryFn: () => api.get<PayBridgeAccountView>("/api/paybridge-account"),
+    enabled,
+  });
+}
+
+export function useCreditScore(enabled: boolean) {
+  return useQuery({
+    queryKey: ["account", "credit-score"] as const,
+    queryFn: () => api.get<PayBridgeScoreView>("/api/credit-score"),
+    enabled,
+  });
+}
+
+export function useMyReferrals(enabled: boolean) {
+  return useQuery({
+    queryKey: ["account", "referrals"] as const,
+    queryFn: () => api.get<ReferralSummaryView>("/api/referrals/me"),
+    enabled,
+  });
+}
+
+export function useSendReferral() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SendReferralInput) => api.post<ReferralView>("/api/referrals/invite", input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["account", "referrals"] }),
+  });
+}
+
+export function useSavingsBridgeDraws(enabled: boolean) {
+  return useQuery({
+    queryKey: ["account", "savings-bridge", "draws"] as const,
+    queryFn: () => api.get<{ items: SavingsBridgeDrawView[] }>("/api/savings-bridge/draws"),
+    enabled,
+  });
+}
+
+export function useRequestSavingsBridge() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RequestSavingsBridgeInput) =>
+      api.post<SavingsBridgeDrawView>("/api/savings-bridge/request", input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["account", "savings-bridge", "draws"] });
+      void qc.invalidateQueries({ queryKey: ["account", "savings", "goals"] });
+    },
   });
 }
 

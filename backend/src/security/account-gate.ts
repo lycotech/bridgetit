@@ -39,6 +39,7 @@ export interface AccountRow {
   kycRejectionReason: string | null;
   suspendedReason: string | null;
   twoFactorEnabledAt: Date | null;
+  referralCode: string | null;
   createdAt: Date;
 }
 

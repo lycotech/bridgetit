@@ -66,6 +66,8 @@ export interface RecordInput {
     | "credit_decision"
     | "bridge_draw"
     | "salary_account_request"
+    | "savings_bridge_draw"
+    | "referral"
     | "savings_goal"
     | "investment_commitment"
     | "session"

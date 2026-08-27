@@ -151,6 +151,7 @@ const ACCOUNT_SELECT = {
   kycRejectionReason: true,
   suspendedReason: true,
   twoFactorEnabledAt: true,
+  referralCode: true,
   createdAt: true,
 } as const;
 
@@ -353,6 +354,98 @@ function undeliverableCode(code: string): string | undefined {
   return code;
 }
 
+/**
+ * Referral join trigger — the only place a Referral row's "joined" fields
+ * are ever written, and the only place a referral reward is ever credited.
+ *
+ * Called after the new user exists but before the response is sent. Never
+ * allowed to fail registration itself: a bug in referral processing must
+ * degrade to "the referral silently didn't complete," not "the person
+ * couldn't create an account," so this is wrapped in try/catch by its caller
+ * and only ever record()s a failure rather than throwing.
+ *
+ * Match order: an existing invite to this exact email wins over a bare
+ * referral code, because it is the stronger signal (a real prior invite, not
+ * just a code typed into a form). Self-referral is blocked both ways: a
+ * referrer cannot invite themselves, and cannot register using their own
+ * code.
+ */
+async function processReferralJoin(
+  c: Context,
+  newUser: { id: string; email: string; fullName: string },
+  referralCode: string | undefined,
+): Promise<void> {
+  const email = newUser.email.toLowerCase();
+
+  let referral = await prisma.referral.findFirst({
+    where: { referredEmail: email, status: "invited" },
+  });
+
+  if (!referral && referralCode) {
+    const referrer = await prisma.user.findUnique({
+      where: { referralCode },
+      select: { id: true, email: true },
+    });
+    if (referrer && referrer.email.toLowerCase() !== email) {
+      referral = await prisma.referral.create({
+        data: {
+          referrerUserId: referrer.id,
+          referredName: newUser.fullName,
+          referredEmail: email,
+        },
+      });
+    }
+  }
+
+  if (!referral || referral.referrerUserId === newUser.id) return;
+
+  await prisma.$transaction(async (tx) => {
+    let goal = await tx.savingsGoal.findFirst({
+      where: { userId: referral!.referrerUserId, status: "active" },
+      orderBy: { createdAt: "asc" },
+    });
+    if (!goal) {
+      goal = await tx.savingsGoal.create({
+        data: { userId: referral!.referrerUserId, label: "Referral rewards" },
+      });
+    }
+
+    const rewardAmount = Number(referral!.rewardAmount);
+    const balanceAfter = Number(goal.balance) + rewardAmount;
+    const transaction = await tx.savingsTransaction.create({
+      data: {
+        goalId: goal.id,
+        userId: referral!.referrerUserId,
+        type: "deposit",
+        amount: rewardAmount,
+        note: `Referral reward — ${newUser.fullName} joined PayBridge`,
+        balanceAfter,
+      },
+    });
+    await tx.savingsGoal.update({ where: { id: goal.id }, data: { balance: balanceAfter } });
+
+    await tx.referral.update({
+      where: { id: referral!.id },
+      data: {
+        status: "joined",
+        joinedAt: new Date(),
+        joinedUserId: newUser.id,
+        rewardTransactionId: transaction.id,
+      },
+    });
+  });
+
+  await record(c, {
+    action: "referral.joined",
+    outcome: "success",
+    actorType: "system",
+    actorId: referral.referrerUserId,
+    targetType: "referral",
+    targetId: referral.id,
+    detail: { joinedUserId: newUser.id },
+  });
+}
+
 /* ============================================================== REGISTER */
 
 authRouter.post("/register", validate("json", registerAccountSchema), async (c) => {
@@ -415,6 +508,20 @@ authRouter.post("/register", validate("json", registerAccountSchema), async (c) 
     newStatus: "active",
     detail: { accountType: user.accountType },
   });
+
+  try {
+    await processReferralJoin(c, user, input.referralCode);
+  } catch (err) {
+    await record(c, {
+      action: "referral.join_failed",
+      outcome: "failure",
+      actorType: "system",
+      actorId: user.id,
+      targetType: "user",
+      targetId: user.id,
+      detail: { message: err instanceof Error ? err.message : "unknown error" },
+    });
+  }
 
   /*
    * A session is issued immediately, but it is a `verify_contact` session: the

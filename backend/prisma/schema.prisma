@@ -379,6 +379,12 @@ model User {
   savingsGoals          SavingsGoal[]
   savingsTransactions   SavingsTransaction[]
   investmentCommitments InvestmentCommitment[]
+  payBridgeAccount      PayBridgeAccount?
+  savingsBridgeDraws    SavingsBridgeDraw[]
+  /// Lazily generated on first GET /api/referrals/me — null until then.
+  referralCode          String?                @unique
+  referralsSent         Referral[]             @relation("ReferralsSent")
+  referralsJoined       Referral[]             @relation("ReferralsJoined")
 
   @@index([status])
   @@index([kycStatus])
@@ -1996,6 +2002,30 @@ model SalaryAccountRequest {
   @@index([employeeRecordId, status])
 }
 
+/// A general-purpose PayBridge-managed account for the employee (distinct
+/// from SalaryAccountRequest, which is specifically about payroll routing).
+/// No real bank-issuing partner exists yet, so `status` is always "pending"
+/// today and the bank fields stay null — this row exists so the UI has real
+/// state to read ("coming soon") rather than a hardcoded string, and so a
+/// future partner integration is a status transition, not a new table.
+model PayBridgeAccount {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// pending | active | suspended | closed — only "pending" is ever written
+  /// today.
+  status String @default("pending")
+
+  bankName           String?
+  accountNameEnc     String?
+  accountNumberEnc   String?
+  accountNumberLast4 String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 /// A repayment. Feeds behavioural trust deterministically.
 model Repayment {
   id            String       @id @default(cuid())
@@ -2415,6 +2445,7 @@ model SavingsGoal {
   updatedAt DateTime @updatedAt
 
   transactions SavingsTransaction[]
+  bridgeDraws  SavingsBridgeDraw[]
 
   @@index([userId, status])
 }
@@ -2438,6 +2469,80 @@ model SavingsTransaction {
 
   @@index([goalId, createdAt])
   @@index([userId, createdAt])
+}
+
+/// A draw against 50% of a savings goal held 30+ days — the real counterpart
+/// of the demo-only mock "bridge from savings" (AGENTS.md §10). Deliberately
+/// NOT BridgeDraw: that model's employerId/limitId are required and mean
+/// employer-facility funding, which this is not. Fee-free, unlike ordinary
+/// Bridge. Status stops at approved/rejected — never "disbursed", since
+/// nothing in this codebase disburses money anywhere (see BridgeDraw's own
+/// comment on Disbursement being unbuilt). Approval decrements the goal's
+/// balance and writes a SavingsTransaction, exactly like a normal withdrawal.
+model SavingsBridgeDraw {
+  id     String      @id @default(cuid())
+  userId String
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goalId String
+  goal   SavingsGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  reference       String   @unique
+  requestedAmount Decimal  @db.Decimal(18, 2)
+  approvedAmount  Decimal? @db.Decimal(18, 2)
+  /// 50% of the goal's balance at request time — kept for audit even on rejection.
+  eligibleAmount  Decimal  @db.Decimal(18, 2)
+  /// Always 0 today. A column, not a hardcoded literal in the view, so a
+  /// future fee policy is a data migration, not a code change.
+  feeAmount       Decimal  @default(0) @db.Decimal(18, 2)
+
+  /// requested | approved | rejected
+  status          String  @default("requested")
+  rejectionReason String?
+
+  requestedAt             DateTime  @default(now())
+  decidedAt               DateTime?
+  decidedBy               String?
+  decidedByLabel          String?
+  /// The SavingsTransaction(type: withdrawal) created on approval.
+  withdrawalTransactionId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([goalId])
+}
+
+/// A referral invite and its eventual outcome — real counterpart of the
+/// demo-only mock referral system (AGENTS.md §10). The reward is a REAL
+/// SavingsTransaction deposit once joined (routes/auth.ts's register
+/// handler is the only writer of the joined fields), not an unexplained
+/// number — the same self-reported-ledger honesty every Savings deposit
+/// already carries.
+model Referral {
+  id             String @id @default(cuid())
+  referrerUserId String
+  referrer       User   @relation("ReferralsSent", fields: [referrerUserId], references: [id], onDelete: Cascade)
+
+  referredName  String
+  referredEmail String
+  /// invited | joined
+  status        String  @default("invited")
+  rewardAmount  Decimal @default(2000) @db.Decimal(18, 2)
+
+  invitedAt           DateTime  @default(now())
+  joinedAt            DateTime?
+  joinedUserId        String?
+  joinedUser          User?     @relation("ReferralsJoined", fields: [joinedUserId], references: [id], onDelete: SetNull)
+  /// Points at the SavingsTransaction the reward landed in. Not a hard FK —
+  /// a goal or transaction can be deleted without orphaning this row.
+  rewardTransactionId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([referrerUserId, referredEmail])
+  @@index([referrerUserId, status])
 }
 
 // ==========================================================================

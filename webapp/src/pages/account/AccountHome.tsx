@@ -9,6 +9,8 @@ import {
   Check,
   Clock3,
   FileWarning,
+  Gauge,
+  Gift,
   LifeBuoy,
   Lock,
   PiggyBank,
@@ -21,6 +23,7 @@ import { AccountLayout } from "@/components/account/AccountLayout";
 import { ActionButton } from "@/components/dashboard/PageHeader";
 import { CheckboxField } from "@/components/dashboard/forms";
 import { TwoFactorPanel } from "@/components/account/TwoFactorPanel";
+import { AIAssistWidget } from "@/components/account/AIAssistWidget";
 import {
   useBridgeDraws,
   useCreateInvestmentCommitment,
@@ -31,10 +34,14 @@ import {
   useEnrolTwoFactor,
   useInvestmentCommitments,
   useKycStatus,
+  useMyReferrals,
   useMySalaryAccountRequests,
+  useCreditScore,
+  usePayBridgeAccount,
   usePortfolioSnapshot,
   useRequestBridgeDraw,
   useRequestSalaryAccount,
+  useRequestSavingsBridge,
   useSavingsDeposit,
   useSavingsGoals,
   useSavingsWithdraw,
@@ -380,22 +387,80 @@ function SalaryAccountSection() {
 }
 
 /**
+ * PayBridge Account — a general-purpose PayBridge-managed account, distinct
+ * from the Salary Account above. No real bank-issuing partner exists yet
+ * (backend/src/routes/paybridge-account.ts), so this is honestly "coming
+ * soon" rather than a fabricated account number.
+ */
+function PayBridgeAccountSection() {
+  const account = usePayBridgeAccount(true);
+  if (!account.data || account.data.status !== "pending") return null;
+
+  return (
+    <Panel tone="info" icon={<Building2 className="h-5 w-5 text-primary" />} title="PayBridge Account">
+      <p>
+        A general-purpose PayBridge-managed account — coming soon. We're finalizing our banking partnership; this
+        will be available once it's ready.
+      </p>
+    </Panel>
+  );
+}
+
+/**
+ * Credit score — real counterpart of the demo-only mock score (which was
+ * random(300,850)). backend/src/scoring/paybridge-score.ts computes this
+ * from real signals only, capped short of the top band since real repayment
+ * history doesn't exist anywhere in this system yet.
+ */
+function CreditScoreSection() {
+  const score = useCreditScore(true);
+  if (!score.data) return null;
+
+  return (
+    <Panel tone="info" icon={<Gauge className="h-5 w-5 text-primary" />} title="PayBridge Score">
+      <div className="flex items-baseline gap-3">
+        <span className="font-display text-3xl font-extrabold text-foreground tnum">{score.data.score}</span>
+        <span className="text-sm font-semibold text-primary">{score.data.band}</span>
+      </div>
+      <ul className="mt-3 space-y-1">
+        {score.data.signals.map((s) => (
+          <li key={s.key} className="text-xs text-muted-foreground">
+            {s.detail}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-xs text-muted-foreground/80">{score.data.disclaimer}</p>
+    </Panel>
+  );
+}
+
+/**
  * Savings — a self-service ledger, not a bank account. backend/src/routes/
  * savings.ts: no bank rail exists yet, so a deposit/withdrawal here is a
  * self-reported bookkeeping entry, not money PayBridge actually moved. This
  * is stated to the user, not hidden.
  */
+/** Matches the server formula in savings-bridge.ts — display only, the server never trusts this. */
+function savingsBridgeEligible(balance: number, createdAt: string): number {
+  const ageDays = Math.floor((Date.now() - new Date(createdAt).getTime()) / 86_400_000);
+  if (ageDays < 30) return 0;
+  return Math.floor(balance * 0.5);
+}
+
 function SavingsSection() {
   const goals = useSavingsGoals(true);
   const createGoal = useCreateSavingsGoal();
   const deposit = useSavingsDeposit();
   const withdraw = useSavingsWithdraw();
+  const requestBridge = useRequestSavingsBridge();
 
   const [label, setLabel] = useState("");
   const [creating, setCreating] = useState(false);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [busyGoal, setBusyGoal] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [bridgingGoal, setBridgingGoal] = useState<string | null>(null);
+  const [bridgeResult, setBridgeResult] = useState<Record<string, string>>({});
 
   const createGoalSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -422,6 +487,28 @@ function SavingsSection() {
     }
   };
 
+  const bridgeFromSavings = async (goalId: string, eligible: number) => {
+    setBridgingGoal(goalId);
+    setBridgeResult((prev) => ({ ...prev, [goalId]: "" }));
+    try {
+      const draw = await requestBridge.mutateAsync({ goalId, amount: eligible });
+      setBridgeResult((prev) => ({
+        ...prev,
+        [goalId]:
+          draw.status === "approved"
+            ? `Bridged ₦${(draw.approvedAmount ?? 0).toLocaleString("en-NG")} — reference ${draw.reference}.`
+            : `Not approved (${draw.reference}): ${draw.rejectionReason}`,
+      }));
+    } catch (err) {
+      setBridgeResult((prev) => ({
+        ...prev,
+        [goalId]: err instanceof Error ? err.message : "That request could not be processed.",
+      }));
+    } finally {
+      setBridgingGoal(null);
+    }
+  };
+
   return (
     <Panel tone="info" icon={<PiggyBank className="h-5 w-5 text-primary" />} title="Savings">
       <p className="text-xs text-muted-foreground">
@@ -429,33 +516,55 @@ function SavingsSection() {
       </p>
 
       <div className="mt-3 space-y-3">
-        {goals.data?.items.map((g) => (
-          <div key={g.id} className="rounded-xl border border-border bg-secondary/30 px-3.5 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-foreground">{g.label}</p>
-              <p className="text-sm font-bold tnum text-foreground">
-                ₦{g.balance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-              </p>
+        {goals.data?.items.map((g) => {
+          const eligible = savingsBridgeEligible(g.balance, g.createdAt);
+          return (
+            <div key={g.id} className="rounded-xl border border-border bg-secondary/30 px-3.5 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-foreground">{g.label}</p>
+                <p className="text-sm font-bold tnum text-foreground">
+                  ₦{g.balance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Amount"
+                  value={amounts[g.id] ?? ""}
+                  onChange={(e) => setAmounts((prev) => ({ ...prev, [g.id]: e.target.value }))}
+                  className="h-9 w-32 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground"
+                />
+                <ActionButton size="sm" variant="secondary" loading={busyGoal === g.id} onClick={() => void act(g.id, "deposit")}>
+                  Deposit
+                </ActionButton>
+                <ActionButton size="sm" variant="ghost" loading={busyGoal === g.id} onClick={() => void act(g.id, "withdraw")}>
+                  Withdraw
+                </ActionButton>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-3 border-t border-border/60 pt-2">
+                <p className="text-xs text-muted-foreground">
+                  Eligible to bridge: ₦{eligible.toLocaleString("en-NG")}{" "}
+                  <span className="text-muted-foreground/70">(50% of savings held 30+ days)</span>
+                </p>
+                {eligible > 0 ? (
+                  <ActionButton
+                    size="sm"
+                    variant="ghost"
+                    loading={bridgingGoal === g.id}
+                    onClick={() => void bridgeFromSavings(g.id, eligible)}
+                  >
+                    Bridge from savings
+                  </ActionButton>
+                ) : null}
+              </div>
+              {bridgeResult[g.id] ? (
+                <p className="mt-1 text-xs text-muted-foreground">{bridgeResult[g.id]}</p>
+              ) : null}
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Amount"
-                value={amounts[g.id] ?? ""}
-                onChange={(e) => setAmounts((prev) => ({ ...prev, [g.id]: e.target.value }))}
-                className="h-9 w-32 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground"
-              />
-              <ActionButton size="sm" variant="secondary" loading={busyGoal === g.id} onClick={() => void act(g.id, "deposit")}>
-                Deposit
-              </ActionButton>
-              <ActionButton size="sm" variant="ghost" loading={busyGoal === g.id} onClick={() => void act(g.id, "withdraw")}>
-                Withdraw
-              </ActionButton>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {message ? <p className="mt-2 text-xs text-muted-foreground">{message}</p> : null}
@@ -679,6 +788,14 @@ export default function AccountHome() {
       eyebrow="Verified account"
       title={`Welcome, ${firstName}`}
       description="Your identity is confirmed and your PayBridge account is open."
+      actions={
+        <Link
+          to="/account/refer"
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-4 py-2 text-sm font-semibold text-foreground hover:border-primary/50 hover:text-primary"
+        >
+          <Gift className="h-4 w-4" /> Refer &amp; earn
+        </Link>
+      }
     >
       <Panel tone="success" icon={<BadgeCheck className="h-5 w-5 text-primary" />} title="Identity verified">
         <p>
@@ -690,9 +807,12 @@ export default function AccountHome() {
       <EligibilitySection />
       <BridgeRequestSection />
       <SalaryAccountSection />
+      <PayBridgeAccountSection />
+      <CreditScoreSection />
       <SavingsSection />
       {user?.accountType === "investor" ? <InvestmentSection /> : null}
       <TwoFactorSection enabled={user?.twoFactorEnabled ?? false} />
+      <AIAssistWidget />
 
       <div className="grid gap-3 sm:grid-cols-2">
         {LOCKED_FEATURES.map((feature) => (

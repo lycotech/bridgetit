@@ -9,12 +9,16 @@ import { sampleRouter } from "./routes/sample";
 import { waitlistRouter } from "./routes/waitlist";
 import { registrationsRouter } from "./routes/registrations";
 import { authRouter } from "./routes/auth";
+import { referralsRouter } from "./routes/referrals";
 import { employerRouter } from "./routes/employer";
 import { payrollRouter } from "./routes/employer-payroll";
 import { employeeLinkRouter } from "./routes/employee-link";
 import { bridgeRouter } from "./routes/bridge";
 import { salaryAccountRouter } from "./routes/salary-account";
+import { savingsBridgeRouter } from "./routes/savings-bridge";
 import { employerSalaryAccountsRouter } from "./routes/employer-salary-accounts";
+import { payBridgeAccountRouter } from "./routes/paybridge-account";
+import { creditScoreRouter } from "./routes/credit-score";
 import { savingsRouter } from "./routes/savings";
 import { investmentsRouter } from "./routes/investments";
 import { adminRouter } from "./routes/admin";
@@ -152,12 +156,23 @@ app.route("/api/auth", authRouter);
 // The customer side of linking a real account to a payroll roster row, plus
 // the eligibility checklist that depends on it. Same session as /api/auth.
 app.route("/api/auth", employeeLinkRouter);
+// Referral codes/invites/status. The reward-crediting join trigger lives in
+// authRouter's own /register handler, not here. See routes/referrals.ts.
+app.route("/api/referrals", referralsRouter);
 // The earned-wage-access draw request. Same customer session as /api/auth.
 app.route("/api/bridge", bridgeRouter);
 // Request/review a PayBridge-managed payroll destination account. Employee
 // side shares the customer session; employer side is mounted below with the
 // rest of the employer-portal routes.
 app.route("/api/salary-account", salaryAccountRouter);
+// A draw against 50% of a savings goal held 30+ days — independent from
+// employer-facility-funded Bridge above. See routes/savings-bridge.ts.
+app.route("/api/savings-bridge", savingsBridgeRouter);
+// General-purpose PayBridge-managed account, always "pending" until a real
+// bank-issuing partner exists. See routes/paybridge-account.ts.
+app.route("/api/paybridge-account", payBridgeAccountRouter);
+// Deterministic, computed-live internal score. See scoring/paybridge-score.ts.
+app.route("/api/credit-score", creditScoreRouter);
 // Self-service ledgers — same customer session as /api/auth. See
 // routes/savings.ts and routes/investments.ts for the honesty limitation
 // both share (no bank rail exists yet).

@@ -45,6 +45,7 @@ import CustomerSignIn from "./pages/account/SignIn";
 import VerifyEmail from "./pages/account/VerifyEmail";
 import VerifyIdentity from "./pages/account/VerifyIdentity";
 import AccountHome from "./pages/account/AccountHome";
+import Refer from "./pages/account/Refer";
 import LinkEmployer from "./pages/account/LinkEmployer";
 import { RequireGate, RedirectIfSignedIn as RedirectIfCustomerSignedIn } from "@/components/account/AccountGate";
 import EmployerPortalRegister from "./pages/employer-portal/Register";
@@ -190,6 +191,14 @@ const App = () => (
               element={
                 <RequireGate allow={["kyc_pending", "kyc_rejected", "active", "suspended", "closed"]}>
                   <AccountHome />
+                </RequireGate>
+              }
+            />
+            <Route
+              path="/account/refer"
+              element={
+                <RequireGate allow={["active"]}>
+                  <Refer />
                 </RequireGate>
               }
             />

@@ -554,6 +554,8 @@ export const registerAccountSchema = z.object({
   accountType: z.enum(ACCOUNT_TYPES),
   /** Privacy policy acknowledgement. Refused without it. */
   privacyAccepted: z.literal(true, { message: "You must accept the privacy policy." }),
+  /** Optional referral code — see routes/referrals.ts and auth.ts's register handler. */
+  referralCode: z.string().trim().max(20).optional(),
 });
 export type RegisterAccountInput = z.infer<typeof registerAccountSchema>;
 
@@ -1185,6 +1187,98 @@ export const decideSalaryAccountRequestSchema = z.object({
   confirmedAuthorised: z.literal(true, { message: "You must confirm you are authorised to make this change." }),
 });
 export type DecideSalaryAccountRequestInput = z.infer<typeof decideSalaryAccountRequestSchema>;
+
+/* ==========================================================================
+ *  PAYBRIDGE ACCOUNT — a general-purpose PayBridge-managed account for the
+ *  employee, distinct from SalaryAccountRequest (specifically payroll
+ *  routing). No real bank-issuing partner exists yet, so this is always
+ *  "pending" today — see routes/paybridge-account.ts.
+ * ========================================================================== */
+
+export const payBridgeAccountSchema = z.object({
+  id: z.string(),
+  status: z.enum(["pending", "active", "suspended", "closed"]),
+  bankName: z.string().nullable(),
+  accountName: z.string().nullable(),
+  accountNumberMasked: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type PayBridgeAccountView = z.infer<typeof payBridgeAccountSchema>;
+
+/* ==========================================================================
+ *  PAYBRIDGE SCORE — real counterpart of the demo-only mock "credit score"
+ *  (random 300-850, no computation). See scoring/paybridge-score.ts for the
+ *  formula and why it is honestly bounded below the top band.
+ * ========================================================================== */
+
+export const payBridgeScoreSchema = z.object({
+  score: z.number(),
+  band: z.enum(["Excellent", "Good", "Fair", "Building"]),
+  label: z.literal("PayBridge Score"),
+  disclaimer: z.string(),
+  signals: z.array(z.object({ key: z.string(), label: z.string(), points: z.number(), detail: z.string() })),
+  computedAt: z.string(),
+});
+export type PayBridgeScoreView = z.infer<typeof payBridgeScoreSchema>;
+
+/* ==========================================================================
+ *  SAVINGS BRIDGE — a draw against 50% of a savings goal held 30+ days.
+ *  Real counterpart of the demo-only mock "bridge from savings". Fee-free,
+ *  status stops at approved/rejected — never "disbursed". See routes/
+ *  savings-bridge.ts.
+ * ========================================================================== */
+
+export const requestSavingsBridgeSchema = z.object({
+  goalId: z.string().min(1),
+  amount: z.number().positive("Enter an amount greater than zero."),
+});
+export type RequestSavingsBridgeInput = z.infer<typeof requestSavingsBridgeSchema>;
+
+export const savingsBridgeDrawSchema = z.object({
+  id: z.string(),
+  reference: z.string(),
+  goalId: z.string(),
+  requestedAmount: z.number(),
+  approvedAmount: z.number().nullable(),
+  status: z.enum(["requested", "approved", "rejected"]),
+  rejectionReason: z.string().nullable(),
+  requestedAt: z.string(),
+  decidedAt: z.string().nullable(),
+});
+export type SavingsBridgeDrawView = z.infer<typeof savingsBridgeDrawSchema>;
+
+/* ==========================================================================
+ *  REFERRALS — real counterpart of the demo-only mock referral system. The
+ *  reward is a real SavingsTransaction deposit once joined, not an
+ *  unexplained number. See routes/referrals.ts and auth.ts's register
+ *  handler (the only writer of the "joined" fields).
+ * ========================================================================== */
+
+export const sendReferralSchema = z.object({
+  name: z.string().trim().min(2, "Enter their name.").max(120),
+  email: z.string().trim().toLowerCase().email("Enter a valid email address."),
+});
+export type SendReferralInput = z.infer<typeof sendReferralSchema>;
+
+export const referralSchema = z.object({
+  id: z.string(),
+  referredName: z.string(),
+  referredEmail: z.string(),
+  status: z.enum(["invited", "joined"]),
+  rewardAmount: z.number(),
+  invitedAt: z.string(),
+  joinedAt: z.string().nullable(),
+});
+export type ReferralView = z.infer<typeof referralSchema>;
+
+export const referralSummarySchema = z.object({
+  code: z.string(),
+  invited: z.number(),
+  joined: z.number(),
+  totalEarned: z.number(),
+  items: z.array(referralSchema),
+});
+export type ReferralSummaryView = z.infer<typeof referralSummarySchema>;
 
 /* ==========================================================================
  *  SAVINGS — a self-service ledger (backend/prisma/schema.prisma's
@@ -1918,6 +2012,11 @@ export const AUDIT_ACTIONS = [
   "salary_account.requested",
   "salary_account.approved",
   "salary_account.rejected",
+  "savings_bridge.approved",
+  "savings_bridge.rejected",
+  "referral.invited",
+  "referral.joined",
+  "referral.join_failed",
   "risk.score.calculated",
   "risk.decision.recorded",
   "risk.decision.seconded",
