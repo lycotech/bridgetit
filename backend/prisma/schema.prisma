@@ -359,24 +359,25 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  verificationCodes VerificationCode[]
-  kycProfile        KycProfile?
-  kycDocuments      KycDocument[]
+  verificationCodes     VerificationCode[]
+  kycProfile            KycProfile?
+  kycDocuments          KycDocument[]
   /// How PayBridge should behave for this person. See UserPreference — employers
   /// never read it.
-  preferences       UserPreference?
-  supportTickets    SupportTicket[]
-  consents          UserConsent[]
+  preferences           UserPreference?
+  supportTickets        SupportTicket[]
+  consents              UserConsent[]
   /// The employer's payroll-roster row this account has been linked to, if
   /// any. Null until the employee accepts a link invitation (or a future
   /// self-service match) — see routes/employee-link.ts. Nullable and
   /// one-to-one: most `User` rows are never linked to payroll at all (e.g.
   /// investor/employer accounts), and a roster row can be claimed by at most
   /// one account.
-  employeeRecord    EmployeeRecord?
-  bridgeDraws       BridgeDraw[]
-  savingsGoals        SavingsGoal[]
-  savingsTransactions SavingsTransaction[]
+  employeeRecord        EmployeeRecord?
+  bridgeDraws           BridgeDraw[]
+  salaryAccountRequests SalaryAccountRequest[]
+  savingsGoals          SavingsGoal[]
+  savingsTransactions   SavingsTransaction[]
   investmentCommitments InvestmentCommitment[]
 
   @@index([status])
@@ -682,8 +683,8 @@ model Employer {
   subIndustry        String?
   employeeCount      Int?
   /// Self-declared at onboarding. Verified figures live on PayrollCycle.
-  monthlyPayroll     Decimal? @db.Decimal(18, 2)
-  monthlyRevenue     Decimal? @db.Decimal(18, 2)
+  monthlyPayroll     Decimal?  @db.Decimal(18, 2)
+  monthlyRevenue     Decimal?  @db.Decimal(18, 2)
   /// JSON array of state names.
   statesOfOperation  String?
 
@@ -707,36 +708,47 @@ model Employer {
   /// Owning relationship manager (AdminUser.id).
   relationshipManagerId String?
 
+  /// existing_payroll | paybridge_payroll — how this employer runs payroll.
+  /// existing_payroll (default): employer keeps its own payroll system;
+  /// participating employees get a PayBridge Salary Account as their payroll
+  /// destination. paybridge_payroll: employer runs payroll fully through
+  /// PayBridge. See SalaryAccountRequest.
+  payrollModel         String @default("existing_payroll")
+  /// Denormalised count of SalaryAccountRequest rows with status "active".
+  /// Incremented on approval — see routes/employer-salary-accounts.ts.
+  salaryAccountsActive Int    @default(0)
+
   createdBy String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  contacts             EmployerContact[]
-  employerUsers        EmployerUser[]
-  directors            Director[]
-  beneficialOwners     BeneficialOwner[]
-  applications         Application[]
-  documents            EmployerDocument[]
-  consents             Consent[]
-  bankAccounts         BankAccount[]
-  financialPeriods     FinancialPeriod[]
-  payrollCycles        PayrollCycle[]
-  employees            EmployeeRecord[]
-  scores               EmployerScore[]
-  aiAssessments        AiAssessment[]
-  analystReviews       AnalystReview[]
-  complianceChecks     ComplianceCheck[]
-  bureauChecks         BureauCheck[]
-  alerts               Alert[]
-  decisions            CreditDecision[]
-  limits               CreditLimit[]
-  utilisations         Utilisation[]
-  bridgeDraws          BridgeDraw[]
-  repayments           Repayment[]
-  covenants            Covenant[]
-  monitoringReviews    MonitoringReview[]
-  externalIntelligence ExternalIntelligence[]
+  contacts              EmployerContact[]
+  employerUsers         EmployerUser[]
+  directors             Director[]
+  beneficialOwners      BeneficialOwner[]
+  applications          Application[]
+  documents             EmployerDocument[]
+  consents              Consent[]
+  bankAccounts          BankAccount[]
+  financialPeriods      FinancialPeriod[]
+  payrollCycles         PayrollCycle[]
+  employees             EmployeeRecord[]
+  scores                EmployerScore[]
+  aiAssessments         AiAssessment[]
+  analystReviews        AnalystReview[]
+  complianceChecks      ComplianceCheck[]
+  bureauChecks          BureauCheck[]
+  alerts                Alert[]
+  decisions             CreditDecision[]
+  limits                CreditLimit[]
+  utilisations          Utilisation[]
+  bridgeDraws           BridgeDraw[]
+  salaryAccountRequests SalaryAccountRequest[]
+  repayments            Repayment[]
+  covenants             Covenant[]
+  monitoringReviews     MonitoringReview[]
+  externalIntelligence  ExternalIntelligence[]
 
   @@index([status])
   @@index([currentTier])
@@ -1233,11 +1245,11 @@ model PayrollRecord {
   /// Employer's own staff reference. Not a national identifier.
   staffRef         String?
   fullNameEnc      String?
-  grossPay         Decimal  @db.Decimal(18, 2)
-  netPay           Decimal? @db.Decimal(18, 2)
-  deductions       Decimal? @db.Decimal(18, 2)
-  allowances       Decimal? @db.Decimal(18, 2)
-  bonus            Decimal? @db.Decimal(18, 2)
+  grossPay         Decimal   @db.Decimal(18, 2)
+  netPay           Decimal?  @db.Decimal(18, 2)
+  deductions       Decimal?  @db.Decimal(18, 2)
+  allowances       Decimal?  @db.Decimal(18, 2)
+  bonus            Decimal?  @db.Decimal(18, 2)
   accountNumberEnc String?
   paidAt           DateTime?
   /// paid | pending | failed | reversed | partial
@@ -1280,12 +1292,24 @@ model EmployeeRecord {
   userId String? @unique
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  /// The account salary is actually paid into today. Same enc/last4 pairing
+  /// as BankAccount. All null until either a payroll upload or an approved
+  /// SalaryAccountRequest sets them — see routes/employer-salary-accounts.ts.
+  payrollAccountNameEnc   String?
+  payrollAccountNumberEnc String?
+  payrollAccountLast4     String?
+  payrollBankName         String?
+  /// employer_upload | paybridge_salary_account
+  payrollAccountSource    String?
+  payrollAccountUpdatedAt DateTime?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  payrollRecords PayrollRecord[]
-  bridgeDraws    BridgeDraw[]
+  payrollRecords        PayrollRecord[]
+  bridgeDraws           BridgeDraw[]
+  salaryAccountRequests SalaryAccountRequest[]
 
   @@unique([employerId, staffRef])
   @@index([employerId, status])
@@ -1751,8 +1775,8 @@ model CreditDecision {
   overrideJustification String?
   /// What the engine recommended, kept beside what the human chose.
   recommendedTier       String?
-  recommendedLimit      Decimal? @db.Decimal(18, 2)
-  approvedLimit         Decimal? @db.Decimal(18, 2)
+  recommendedLimit      Decimal?  @db.Decimal(18, 2)
+  approvedLimit         Decimal?  @db.Decimal(18, 2)
 
   decidedAt DateTime @default(now())
   createdAt DateTime @default(now())
@@ -1805,7 +1829,7 @@ model CreditLimit {
   cycleCap            Decimal? @db.Decimal(18, 2)
   maxTenorDays        Int?
   pricingTier         String?
-  currency            String  @default("NGN")
+  currency            String   @default("NGN")
 
   /// active | suspended | reduced | expired | closed
   status            String    @default("active")
@@ -1915,6 +1939,61 @@ model BridgeDraw {
   @@index([userId, status])
   @@index([employerId, status])
   @@index([limitId])
+}
+
+/// An employee's request to change their payroll destination account to a
+/// PayBridge-managed "Salary Account" — the real counterpart of the demo-only
+/// mock feature described in AGENTS.md §9. Employer HR/admin reviews and
+/// approves/rejects; approval writes the new account onto EmployeeRecord's
+/// payrollAccount* fields and is the only thing this changes — no money
+/// moves (see BridgeDraw's own comment on Disbursement being unbuilt).
+model SalaryAccountRequest {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  employeeRecordId String
+  employeeRecord   EmployeeRecord @relation(fields: [employeeRecordId], references: [id], onDelete: Cascade)
+
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  /// Human reference, e.g. SAR-2026-000123.
+  reference String @unique
+
+  /// Snapshot of EmployeeRecord.payrollBankName/payrollAccountLast4 at
+  /// submission time. Null if nothing was on file yet.
+  currentBankName     String?
+  currentAccountLast4 String?
+
+  /// Set server-side from PARTNER_BANK_NAME at creation — never client input,
+  /// so a request cannot name an arbitrary receiving bank.
+  newBankName         String
+  newAccountNameEnc   String
+  newAccountNumberEnc String
+  newAccountLast4     String
+
+  /// pending_review | active | rejected | suspended
+  /// No separate "approved" step — approval goes straight to "active".
+  status          String  @default("pending_review")
+  rejectionReason String?
+
+  requestedAt    DateTime  @default(now())
+  decidedAt      DateTime?
+  decidedBy      String?
+  decidedByLabel String?
+
+  consentSignedAt    DateTime @default(now())
+  consentDeviceRef   String?
+  consentReferenceId String   @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employerId, status])
+  @@index([userId, status])
+  @@index([employeeRecordId, status])
 }
 
 /// A repayment. Feeds behavioural trust deterministically.
@@ -2326,11 +2405,11 @@ model SavingsGoal {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   label        String
-  targetAmount Decimal? @db.Decimal(18, 2)
+  targetAmount Decimal?  @db.Decimal(18, 2)
   targetDate   DateTime?
-  balance      Decimal  @default(0) @db.Decimal(18, 2)
+  balance      Decimal   @default(0) @db.Decimal(18, 2)
   /// active | closed
-  status       String   @default("active")
+  status       String    @default("active")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2349,11 +2428,11 @@ model SavingsTransaction {
 
   /// deposit | withdrawal
   type         String
-  amount       Decimal  @db.Decimal(18, 2)
+  amount       Decimal @db.Decimal(18, 2)
   note         String?
   /// The goal's balance immediately after this entry — makes the ledger
   /// self-auditable without replaying the whole history.
-  balanceAfter Decimal  @db.Decimal(18, 2)
+  balanceAfter Decimal @db.Decimal(18, 2)
 
   createdAt DateTime @default(now())
 

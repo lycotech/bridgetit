@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Loader2, LogOut, UserPlus, Wallet } from "lucide-react";
+import { ClipboardList, Loader2, LogOut, UserPlus, Wallet } from "lucide-react";
 import { PageHeader, ActionButton } from "@/components/dashboard/PageHeader";
 import { Panel, SummaryRow } from "@/components/dashboard/Panel";
 import { TwoFactorPanel } from "@/components/account/TwoFactorPanel";
@@ -105,6 +105,13 @@ export default function EmployerPortalHome() {
           <>
             <ActionButton variant="secondary" to="/employer-portal/payroll" icon={<Wallet className="h-4 w-4" />}>
               Payroll
+            </ActionButton>
+            <ActionButton
+              variant="secondary"
+              to="/employer-portal/salary-account-requests"
+              icon={<ClipboardList className="h-4 w-4" />}
+            >
+              Salary accounts
             </ActionButton>
             <ActionButton
               variant="ghost"

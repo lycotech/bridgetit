@@ -5,6 +5,7 @@ import {
   ArrowRight,
   BadgeCheck,
   Ban,
+  Building2,
   Check,
   Clock3,
   FileWarning,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import { AccountLayout } from "@/components/account/AccountLayout";
 import { ActionButton } from "@/components/dashboard/PageHeader";
+import { CheckboxField } from "@/components/dashboard/forms";
 import { TwoFactorPanel } from "@/components/account/TwoFactorPanel";
 import {
   useBridgeDraws,
@@ -29,14 +31,17 @@ import {
   useEnrolTwoFactor,
   useInvestmentCommitments,
   useKycStatus,
+  useMySalaryAccountRequests,
   usePortfolioSnapshot,
   useRequestBridgeDraw,
+  useRequestSalaryAccount,
   useSavingsDeposit,
   useSavingsGoals,
   useSavingsWithdraw,
   useSession,
   useWithdrawInvestmentCommitment,
 } from "@/lib/account/session";
+import { PARTNER_BANK_NAME_DEFAULT } from "../../../../backend/src/types";
 
 /**
  * The customer's own account screen. One page, four faces, chosen by the gate
@@ -255,6 +260,117 @@ function BridgeRequestSection() {
                 {d.reference} · {d.status}
               </span>
               <span className="tnum">₦{d.requestedAmount.toLocaleString("en-NG")}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </Panel>
+  );
+}
+
+/**
+ * Salary Account — real counterpart of the demo-only mock feature described
+ * in AGENTS.md §9. Requests that payroll be redirected to a PayBridge-managed
+ * account; the employer's HR/admin reviews and decides
+ * (routes/employer-salary-accounts.ts). Nothing here moves money — approval
+ * only changes which account is recorded as the payroll destination.
+ * Only shown once the employee is linked to an employer (a non-null
+ * `employerName` from eligibility is used as that signal client-side; the
+ * backend is the actual source of truth and rejects an unlinked employee's
+ * request regardless of what this section renders).
+ */
+function SalaryAccountSection() {
+  const { data: eligibility } = useEligibility(true);
+  const requests = useMySalaryAccountRequests(true);
+  const request = useRequestSalaryAccount();
+  const [accountName, setAccountName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [consent, setConsent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!eligibility?.employerName) return null;
+
+  const openRequest = requests.data?.items.find((r) => r.status === "pending_review" || r.status === "active");
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    if (!consent) {
+      setError("You must confirm this authorization to continue.");
+      return;
+    }
+    try {
+      await request.mutateAsync({ accountName, accountNumber, confirmedConsent: true });
+      setAccountName("");
+      setAccountNumber("");
+      setConsent(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That request could not be processed.");
+    }
+  };
+
+  return (
+    <Panel tone="info" icon={<Building2 className="h-5 w-5 text-primary" />} title="PayBridge Salary Account">
+      <p>
+        Request that your salary be paid into a dedicated {PARTNER_BANK_NAME_DEFAULT} account. Your employer's
+        payroll process does not change — this only updates the account your salary is recorded against, and takes
+        effect once your employer approves it.
+      </p>
+
+      {openRequest ? (
+        <p className="text-sm text-muted-foreground">
+          Your request ({openRequest.reference}) is currently <strong>{openRequest.status.replace("_", " ")}</strong>.
+        </p>
+      ) : (
+        <form onSubmit={submit} className="space-y-3">
+          <label className="block text-sm font-medium text-muted-foreground">
+            Account name
+            <input
+              type="text"
+              required
+              value={accountName}
+              onChange={(e) => setAccountName(e.target.value)}
+              className="mt-1.5 block h-11 w-full rounded-xl border border-border bg-background px-3.5 text-sm text-foreground"
+            />
+          </label>
+          <label className="block text-sm font-medium text-muted-foreground">
+            Account number
+            <input
+              type="text"
+              required
+              inputMode="numeric"
+              pattern="\d{10}"
+              maxLength={10}
+              value={accountNumber}
+              onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ""))}
+              className="mt-1.5 block h-11 w-full rounded-xl border border-border bg-background px-3.5 text-sm text-foreground"
+            />
+          </label>
+          <CheckboxField checked={consent} onChange={setConsent} required>
+            I voluntarily request and authorise my employer to update my nominated salary-payment account to this
+            PayBridge Salary Account for as long as I remain enrolled in PayBridge Access.
+          </CheckboxField>
+          <ActionButton type="submit" loading={request.isPending}>
+            Request Salary Account
+          </ActionButton>
+        </form>
+      )}
+
+      {error ? (
+        <p className="flex items-start gap-2 text-sm text-destructive">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          {error}
+        </p>
+      ) : null}
+
+      {requests.data?.items.length ? (
+        <div className="mt-1 space-y-1.5 border-t border-border/70 pt-3">
+          {requests.data.items.slice(0, 5).map((r) => (
+            <div key={r.id} className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                {r.reference} · {r.status.replace("_", " ")}
+              </span>
+              <span>{r.newAccountMasked}</span>
             </div>
           ))}
         </div>
@@ -573,6 +689,7 @@ export default function AccountHome() {
 
       <EligibilitySection />
       <BridgeRequestSection />
+      <SalaryAccountSection />
       <SavingsSection />
       {user?.accountType === "investor" ? <InvestmentSection /> : null}
       <TwoFactorSection enabled={user?.twoFactorEnabled ?? false} />

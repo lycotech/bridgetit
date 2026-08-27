@@ -5,6 +5,8 @@ import type {
   EmployeeRecordView,
   PayrollCycleDetailView,
   PayrollCycleView,
+  PayrollModel,
+  PayrollModelView,
 } from "../../../../backend/src/types";
 
 export function usePayrollCycles(enabled: boolean) {
@@ -67,5 +69,22 @@ export function useInviteEmployeeLink() {
     mutationFn: ({ employeeRecordId, email }: { employeeRecordId: string; email: string }) =>
       api.post<{ ok: boolean }>(`/api/employer/payroll/employees/${employeeRecordId}/invite`, { email }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["employer", "payroll", "employees"] }),
+  });
+}
+
+export function usePayrollModel(enabled: boolean) {
+  return useQuery({
+    queryKey: ["employer", "payroll", "model"] as const,
+    queryFn: () => api.get<PayrollModelView>("/api/employer/payroll/model"),
+    enabled,
+  });
+}
+
+export function useUpdatePayrollModel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payrollModel: PayrollModel) =>
+      api.patch<PayrollModelView>("/api/employer/payroll/model", { payrollModel }),
+    onSuccess: (data) => qc.setQueryData(["employer", "payroll", "model"], data),
   });
 }

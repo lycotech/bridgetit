@@ -52,6 +52,8 @@ import EmployerPortalLogin from "./pages/employer-portal/Login";
 import EmployerPortalHome from "./pages/employer-portal/Home";
 import EmployerPortalAcceptInvite from "./pages/employer-portal/AcceptInvite";
 import EmployerPortalPayroll from "./pages/employer-portal/Payroll";
+import EmployerPortalSalaryAccountRequests from "./pages/employer-portal/SalaryAccountRequests";
+import EmployerPortalSalaryAccountRequestReview from "./pages/employer-portal/SalaryAccountRequestReview";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import Verify from "./pages/auth/Verify";
 import SelectRole from "./pages/auth/SelectRole";
@@ -210,6 +212,14 @@ const App = () => (
             <Route path="/employer-portal/accept-invite" element={<EmployerPortalAcceptInvite />} />
             <Route path="/employer-portal" element={<EmployerPortalHome />} />
             <Route path="/employer-portal/payroll" element={<EmployerPortalPayroll />} />
+            <Route
+              path="/employer-portal/salary-account-requests"
+              element={<EmployerPortalSalaryAccountRequests />}
+            />
+            <Route
+              path="/employer-portal/salary-account-requests/:id"
+              element={<EmployerPortalSalaryAccountRequestReview />}
+            />
 
             {/* The gate in front of the private demonstration environment. */}
             <Route path="/private-demo" element={<PrivateDemo />} />

@@ -1104,6 +1104,89 @@ export const bridgeDrawSchema = z.object({
 export type BridgeDrawView = z.infer<typeof bridgeDrawSchema>;
 
 /* ==========================================================================
+ *  SALARY ACCOUNT — real counterpart of the demo-only mock feature described
+ *  in AGENTS.md §9. An employee requests their payroll destination be moved
+ *  to a PayBridge-managed account; employer HR/admin reviews and decides.
+ *  Approval only updates EmployeeRecord.payrollAccount* — no money moves
+ *  anywhere in this codebase yet (see BridgeDraw's own comment above).
+ * ========================================================================== */
+
+export const PARTNER_BANK_NAME_DEFAULT = "PayBridge Partner Bank";
+
+export const PAYROLL_MODELS = ["existing_payroll", "paybridge_payroll"] as const;
+export type PayrollModel = (typeof PAYROLL_MODELS)[number];
+
+export const SALARY_ACCOUNT_STATUSES = ["pending_review", "active", "rejected", "suspended"] as const;
+export type SalaryAccountStatus = (typeof SALARY_ACCOUNT_STATUSES)[number];
+
+export const updatePayrollModelSchema = z.object({
+  payrollModel: z.enum(PAYROLL_MODELS),
+});
+export type UpdatePayrollModelInput = z.infer<typeof updatePayrollModelSchema>;
+
+export const payrollModelSchema = z.object({
+  payrollModel: z.enum(PAYROLL_MODELS),
+  salaryAccountsActive: z.number(),
+});
+export type PayrollModelView = z.infer<typeof payrollModelSchema>;
+
+export const requestSalaryAccountSchema = z.object({
+  accountName: z.string().trim().min(2, "Enter the account name.").max(200),
+  accountNumber: z.string().trim().regex(/^\d{10}$/, "Enter a valid 10-digit account number."),
+  /** Consent checkbox — refused without it, same pattern as privacyAccepted on registration. */
+  confirmedConsent: z.literal(true, { message: "You must confirm this authorization to continue." }),
+});
+export type RequestSalaryAccountInput = z.infer<typeof requestSalaryAccountSchema>;
+
+/** An employee's own view of one of their requests. */
+export const salaryAccountRequestSchema = z.object({
+  id: z.string(),
+  reference: z.string(),
+  status: z.enum(SALARY_ACCOUNT_STATUSES),
+  newBankName: z.string(),
+  newAccountMasked: z.string(),
+  requestedAt: z.string(),
+  decidedAt: z.string().nullable(),
+  rejectionReason: z.string().nullable(),
+});
+export type SalaryAccountRequestView = z.infer<typeof salaryAccountRequestSchema>;
+
+/** The employer-side review view — includes the employee's consent record and current account. */
+export const salaryAccountRequestDetailSchema = z.object({
+  id: z.string(),
+  reference: z.string(),
+  status: z.enum(SALARY_ACCOUNT_STATUSES),
+  employeeName: z.string().nullable(),
+  staffRef: z.string(),
+  currentBankName: z.string().nullable(),
+  currentAccountMasked: z.string().nullable(),
+  newBankName: z.string(),
+  /** Shown in full, not masked — the employer needs this to verify the account
+   *  holder name plausibly matches the employee, the actual anti-fraud check
+   *  in this flow. Only the account number is masked. */
+  newAccountName: z.string(),
+  newAccountMasked: z.string(),
+  requestedAt: z.string(),
+  decidedAt: z.string().nullable(),
+  decidedByLabel: z.string().nullable(),
+  rejectionReason: z.string().nullable(),
+  consent: z.object({
+    signedAt: z.string(),
+    deviceRef: z.string().nullable(),
+    consentReferenceId: z.string(),
+  }),
+});
+export type SalaryAccountRequestDetailView = z.infer<typeof salaryAccountRequestDetailSchema>;
+
+export const decideSalaryAccountRequestSchema = z.object({
+  decision: z.enum(["approve", "reject"]),
+  rejectionReason: z.string().trim().max(500).optional(),
+  /** The reviewer's "I confirm I am authorised..." checkbox — enforced server-side, not just UI. */
+  confirmedAuthorised: z.literal(true, { message: "You must confirm you are authorised to make this change." }),
+});
+export type DecideSalaryAccountRequestInput = z.infer<typeof decideSalaryAccountRequestSchema>;
+
+/* ==========================================================================
  *  SAVINGS — a self-service ledger (backend/prisma/schema.prisma's
  *  SavingsGoal/SavingsTransaction). No bank rail exists yet — a deposit or
  *  withdrawal here is a self-reported bookkeeping entry, not money PayBridge
@@ -1829,8 +1912,12 @@ export const AUDIT_ACTIONS = [
   "employer.mfa.recovery_used",
   "employer.payroll.cycle_created",
   "employer.payroll.uploaded",
+  "employer.payroll_model.updated",
   "employee.link.invited",
   "employee.link.accepted",
+  "salary_account.requested",
+  "salary_account.approved",
+  "salary_account.rejected",
   "risk.score.calculated",
   "risk.decision.recorded",
   "risk.decision.seconded",

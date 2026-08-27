@@ -4,7 +4,7 @@ import { prisma } from "../db";
 import { rateLimit } from "../security/rate-limit";
 import { validate } from "../security/validate";
 import { record } from "../security/audit-store";
-import { requireEmployerUser } from "./employer";
+import { requireEmployerUser, requireEmployerAdmin } from "./employer";
 import { encryptField, decryptField } from "../security/field-crypto";
 import { signEmployeeLinkInvite } from "../security/employee-link";
 import { sendMail } from "../email/mailer";
@@ -12,10 +12,12 @@ import { BRIDGERS } from "../email/identities";
 import {
   createPayrollCycleSchema,
   inviteEmployeeLinkSchema,
+  updatePayrollModelSchema,
   type EmployeeRecordView,
   type PayrollCycleDetailView,
   type PayrollCycleView,
   type PayrollRecordView,
+  type PayrollModelView,
 } from "../types";
 
 /**
@@ -466,5 +468,53 @@ payrollRouter.post(
     return c.json({ data: { ok: true } }, 201);
   },
 );
+
+/*
+ * Payroll participation model — the real counterpart of the demo-only mock
+ * "PayrollSetupCard" (AGENTS.md §9). Any read/write here is a plain flag on
+ * `Employer`; the actual work of moving a specific employee's payroll
+ * destination account lives in routes/salary-account.ts and
+ * routes/employer-salary-accounts.ts.
+ */
+payrollRouter.get("/model", async (c) => {
+  const actor = c.get("employerUser")!;
+  const employer = await prisma.employer.findUniqueOrThrow({
+    where: { id: actor.employerId },
+    select: { payrollModel: true, salaryAccountsActive: true },
+  });
+  const view: PayrollModelView = {
+    payrollModel: employer.payrollModel as PayrollModelView["payrollModel"],
+    salaryAccountsActive: employer.salaryAccountsActive,
+  };
+  return c.json({ data: view });
+});
+
+payrollRouter.patch("/model", requireEmployerAdmin(), validate("json", updatePayrollModelSchema), async (c) => {
+  const actor = c.get("employerUser")!;
+  const input = c.req.valid("json");
+
+  const employer = await prisma.employer.update({
+    where: { id: actor.employerId },
+    data: { payrollModel: input.payrollModel },
+    select: { payrollModel: true, salaryAccountsActive: true },
+  });
+
+  await record(c, {
+    action: "employer.payroll_model.updated",
+    outcome: "success",
+    actorType: "user",
+    actorId: actor.id,
+    actorLabel: actor.email,
+    targetType: "employer",
+    targetId: actor.employerId,
+    detail: { payrollModel: input.payrollModel },
+  });
+
+  const view: PayrollModelView = {
+    payrollModel: employer.payrollModel as PayrollModelView["payrollModel"],
+    salaryAccountsActive: employer.salaryAccountsActive,
+  };
+  return c.json({ data: view });
+});
 
 export { payrollRouter };

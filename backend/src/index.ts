@@ -13,6 +13,8 @@ import { employerRouter } from "./routes/employer";
 import { payrollRouter } from "./routes/employer-payroll";
 import { employeeLinkRouter } from "./routes/employee-link";
 import { bridgeRouter } from "./routes/bridge";
+import { salaryAccountRouter } from "./routes/salary-account";
+import { employerSalaryAccountsRouter } from "./routes/employer-salary-accounts";
 import { savingsRouter } from "./routes/savings";
 import { investmentsRouter } from "./routes/investments";
 import { adminRouter } from "./routes/admin";
@@ -152,6 +154,10 @@ app.route("/api/auth", authRouter);
 app.route("/api/auth", employeeLinkRouter);
 // The earned-wage-access draw request. Same customer session as /api/auth.
 app.route("/api/bridge", bridgeRouter);
+// Request/review a PayBridge-managed payroll destination account. Employee
+// side shares the customer session; employer side is mounted below with the
+// rest of the employer-portal routes.
+app.route("/api/salary-account", salaryAccountRouter);
 // Self-service ledgers — same customer session as /api/auth. See
 // routes/savings.ts and routes/investments.ts for the honesty limitation
 // both share (no bank rail exists yet).
@@ -160,6 +166,7 @@ app.route("/api/investments", investmentsRouter);
 // A company's own multi-seat login — separate session, separate cookie, from
 // the individual customer accounts above. See routes/employer.ts.
 app.route("/api/employer/payroll", payrollRouter);
+app.route("/api/employer/salary-accounts", employerSalaryAccountsRouter);
 app.route("/api/employer", employerRouter);
 // Session-gated: how PayBridge should behave for one person. Functional
 // preferences only, keyed by the session's own user id, with no employer-facing

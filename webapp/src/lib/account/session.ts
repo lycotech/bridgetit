@@ -17,6 +17,8 @@ import type {
   PortfolioSnapshotView,
   RegisterAccountInput,
   RequestBridgeDrawInput,
+  RequestSalaryAccountInput,
+  SalaryAccountRequestView,
   SavingsGoalView,
   SavingsTransactionInput,
   SavingsTransactionView,
@@ -206,6 +208,23 @@ export function useRequestBridgeDraw() {
       void qc.invalidateQueries({ queryKey: ["account", "bridge", "draws"] });
       void qc.invalidateQueries({ queryKey: ["account", "eligibility"] });
     },
+  });
+}
+
+export function useMySalaryAccountRequests(enabled: boolean) {
+  return useQuery({
+    queryKey: ["account", "salary-account", "requests"] as const,
+    queryFn: () => api.get<{ items: SalaryAccountRequestView[] }>("/api/salary-account/requests"),
+    enabled,
+  });
+}
+
+export function useRequestSalaryAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RequestSalaryAccountInput) =>
+      api.post<SalaryAccountRequestView>("/api/salary-account/request", input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["account", "salary-account", "requests"] }),
   });
 }
 

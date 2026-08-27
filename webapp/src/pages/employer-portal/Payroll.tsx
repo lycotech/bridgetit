@@ -3,6 +3,7 @@ import { Link, Navigate } from "react-router-dom";
 import { ArrowLeft, Loader2, Upload } from "lucide-react";
 import { PageHeader, ActionButton } from "@/components/dashboard/PageHeader";
 import { Panel, SummaryRow } from "@/components/dashboard/Panel";
+import { PayrollModelPanel } from "@/components/employer-portal/PayrollModelPanel";
 import { useEmployerSession } from "@/lib/employer/session";
 import {
   useCreatePayrollCycle,
@@ -97,6 +98,11 @@ export default function EmployerPortalPayroll() {
         eyebrow="Payroll"
         title="Payroll cycles"
         description="Create a pay cycle, then upload a CSV of pay records against it. Re-uploading replaces that cycle's records."
+      />
+
+      <PayrollModelPanel
+        authenticated={session.data?.authenticated ?? false}
+        isAdmin={session.data?.role === "employer_admin"}
       />
 
       {canWrite ? (
