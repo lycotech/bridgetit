@@ -122,6 +122,8 @@ The backend should expose services for:
 - Notifications
 - Reporting
 - Admin
+- AI Assistant (chat-based support/guidance, cross-cutting across the Employee App, Employer
+  Portal and Operations Console — not yet built, see AGENTS.md)
 
 Each service should expose REST APIs and enforce role-based permissions.
 

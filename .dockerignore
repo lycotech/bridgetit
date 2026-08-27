@@ -1,0 +1,11 @@
+# Applies to the webapp image build, which uses the repo root as its build
+# context (see webapp/Dockerfile's comment on why). Without this, the whole
+# repo — including both projects' node_modules — gets sent to the Docker
+# daemon on every build.
+**/node_modules
+**/dist
+**/.git
+.claude
+.vscode
+backup-public-site
+*.log

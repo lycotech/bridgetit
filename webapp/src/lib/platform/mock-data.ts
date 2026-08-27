@@ -328,7 +328,7 @@ export const salaryAccountRequests: SalaryAccountRequest[] = SALARY_ACCOUNT_STAT
     consent: {
       signedAt: requestedAt,
       deviceRef: `iOS · Safari · ${pick(["Lagos", "Abuja", "Kaduna", "Port Harcourt"])}, NG`,
-      consentReferenceId: `CNS-${makeReference()}`,
+      consentReferenceId: makeReference("CNS"),
     },
   };
 });

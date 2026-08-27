@@ -1,0 +1,10 @@
+# Root-level ignores. backend/ and webapp/ each carry their own.
+
+# --- Secrets -----------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+.DS_Store

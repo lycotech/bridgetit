@@ -1,0 +1,48 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    expose:
+      - "3000"
+    networks:
+      - app
+
+  webapp:
+    build:
+      context: .
+      dockerfile: webapp/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      - DOMAIN=${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - certbot-conf:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    networks:
+      - app
+
+  # Renews the Let's Encrypt certificate every 12h (a no-op unless it's
+  # within its renewal window). Initial issuance is done by
+  # deploy/init-letsencrypt.sh, not by this service.
+  certbot:
+    image: certbot/certbot
+    restart: unless-stopped
+    volumes:
+      - certbot-conf:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    entrypoint: >
+      /bin/sh -c "trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done"
+
+networks:
+  app:
+
+volumes:
+  certbot-conf:
+  certbot-www:

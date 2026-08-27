@@ -45,13 +45,15 @@ PRD.md names 14 backend services. Here is what actually exists for each, in
 | **Savings** | ✅ Built (2026-08-02) | New `SavingsGoal`/`SavingsTransaction` models. `backend/src/routes/savings.ts` (`/api/savings/*`) — create a goal, deposit, withdraw, all real and persisted. Real UI: a "Savings" panel on the customer's `/account` page. **Honesty limitation, stated in the UI and code, not hidden**: no bank rail exists (§ Disbursement/Repayment, deferred), so a deposit/withdrawal is a self-reported bookkeeping entry — real numbers the customer entered, not money PayBridge moved. The old mock `employee/Savings.tsx` page is untouched. |
 | **Investments** | ✅ Built (2026-08-02) | New `InvestmentCommitment` model. `backend/src/routes/investments.ts` (`/api/investments/*`) — an investor-only (`accountType === "investor"`) commitment ledger, same honesty limitation as Savings, PLUS a real `GET /portfolio` snapshot computed live from `Employer`/`CreditLimit`/`BridgeDraw`/`PayrollCycle` — actual employer count, exposure, Bridge volume, an investor's own vs. total committed capital. Deliberately reports **no yield/return figure** — there is no interest-distribution model anywhere in this codebase, and inventing one would be fabricating a financial promise. Real UI: an "Investments" panel on `/account` for investor accounts. The old mock `employee/Invest.tsx` and the entire `investor/*` demo portal are untouched. |
 | **Reporting** | ✅ Partial (2026-08-02) | `backend/src/routes/admin-reports.ts` (`GET /api/admin/reports/overview`, new `reports.view` permission) — real portfolio-wide aggregates: employers by status/tier, KYC funnel, credit exposure, payroll totals, Bridge draw counts/volume, savings/investment totals. Every query is a `count`/`groupBy`/`aggregate` — no individual customer's name or balance appears, by construction. Real UI at `/admin/reports`. **Partial**: only the ops/admin-side aggregate view was built — the employer-facing `Reports.tsx`, investor-facing `Performance.tsx`/`Statements.tsx`, and every other per-portal reporting page are still mock-service backed; wiring those is dashboard-rewiring work, same category as the note below. |
+| **AI Assistant** | ❌ Not built (added to PRD.md 2026-08-21, planning only) | No backend route, no real LLM call anywhere in the codebase. Scoped in PRD.md as a cross-cutting chat-based support/guidance service, not tied to one portal. **Not the same thing** as `components/employee/AIAssistWidget.tsx` (§10) — that widget is explicitly rules-based/computed from the employee's own numbers, with no live AI call, and lives only in the mock employee demo. When this is actually built, use the `ai-apis-like-chatgpt` skill and decide then which portal(s) it should appear in, what it's allowed to see (same privacy boundary as `HrPrivacy.tsx`/employer visibility rules), and whether it replaces or sits alongside the existing rules-based widget. |
 
-**Bottom line (2026-08-02):** of 14 named services, 11 are genuinely built and wired (Authentication,
-Admin, Employer Management, Payroll Engine, Eligibility Engine, Risk & Compliance, Bridge Engine,
-Treasury, Savings, Investments, Reporting-partial), 2 are partially done (Notifications, Employee
-Management), and only Repayments does not exist as a backend service at all — folded into the
-deferred Disbursement/Repayment item. Every dashboard for the still-mock `/employer/*` and
-`/employee/*` demo pages (which have NOT been
+**Bottom line (2026-08-21, updated for the AI Assistant addition):** of 15 named services, 11 are
+genuinely built and wired (Authentication, Admin, Employer Management, Payroll Engine, Eligibility
+Engine, Risk & Compliance, Bridge Engine, Treasury, Savings, Investments, Reporting-partial), 2 are
+partially done (Notifications, Employee Management), and 2 do not exist as a backend service at
+all: Repayments (folded into the deferred Disbursement/Repayment item) and AI Assistant (added to
+PRD.md 2026-08-21, planning only — not scheduled). Every dashboard for the still-mock `/employer/*`
+and `/employee/*` demo pages (which have NOT been
 rewired to any of the real services above) reads and writes through
 `webapp/src/lib/platform/mock-service.ts`, whose own header comment says: *"Swapping this file
 for Supabase (or the Hono backend) is the single integration point for going live."*
@@ -159,6 +161,11 @@ tick items off here as they land rather than treating this as a static plan.
 11. Test coverage for every area above as it goes real — `risk.test.ts` is currently the *only*
     test file in the repo; no tests exist for any route, `session.ts`, `passwords.ts`, CSRF, or
     anywhere in `webapp/`.
+12. ⏸️ **AI Assistant** — added to PRD.md as a named service (2026-08-21), by explicit user
+    request, **not to be built yet** — this item exists so the service is tracked, not as a
+    signal to start it. When picked up: use the `ai-apis-like-chatgpt` skill, decide which
+    portal(s) it appears in and what data it's allowed to see, and decide its relationship to the
+    existing rules-based `AIAssistWidget.tsx` (§10) — replace it, or keep both.
 
 ## 7. Infra/deploy status
 

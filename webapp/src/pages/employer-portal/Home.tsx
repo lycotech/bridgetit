@@ -19,7 +19,6 @@ import {
 } from "@/lib/employer/company";
 import {
   EMPLOYER_TEAM_ROLE_LABELS,
-  type EmployerTeamRole,
   type UpdateEmployerProfileInput,
 } from "../../../../backend/src/types";
 
@@ -59,7 +58,7 @@ export default function EmployerPortalHome() {
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
-  const [inviteRole, setInviteRole] = useState<EmployerTeamRole>("employer_contributor");
+  const [inviteRole, setInviteRole] = useState<"employer_contributor" | "employer_viewer">("employer_contributor");
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSent, setInviteSent] = useState(false);
 
@@ -180,7 +179,7 @@ export default function EmployerPortalHome() {
               Role
               <select
                 value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value as EmployerTeamRole)}
+                onChange={(e) => setInviteRole(e.target.value as "employer_contributor" | "employer_viewer")}
                 className="mt-1.5 h-11 w-full rounded-xl border border-border bg-background px-3.5 text-sm text-foreground"
               >
                 <option value="employer_contributor">Contributor</option>

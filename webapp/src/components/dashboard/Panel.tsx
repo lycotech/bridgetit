@@ -20,28 +20,46 @@ export function Panel({
   bodyClassName,
   footer,
   headingLevel = 2,
+  icon,
+  tone,
 }: {
   title?: string;
   description?: string;
   action?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   className?: string;
   bodyClassName?: string;
   footer?: ReactNode;
   headingLevel?: 2 | 3 | 4;
+  /** Shown inline before the title. */
+  icon?: ReactNode;
+  /** Tints the panel's border/background — the tone is conveyed by the icon too, not colour alone. */
+  tone?: "info" | "warning" | "success" | "danger";
 }) {
   const headingId = useId();
   const Heading = `h${headingLevel}` as "h2" | "h3" | "h4";
+  const toneClass = tone
+    ? {
+        info: "border-primary/30 bg-primary/[0.06]",
+        warning: "border-amber-500/40 bg-amber-500/[0.07]",
+        success: "border-primary/40 bg-primary/[0.06]",
+        danger: "border-destructive/40 bg-destructive/10",
+      }[tone]
+    : "border-border bg-card";
   return (
     <section
       aria-labelledby={title ? headingId : undefined}
-      className={cn("overflow-hidden rounded-2xl border border-border bg-card", className)}
+      className={cn("overflow-hidden rounded-2xl border", toneClass, className)}
     >
       {title || action ? (
         <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border/70 px-4 py-4 sm:px-5">
           <div className="min-w-0">
             {title ? (
-              <Heading id={headingId} className="font-display text-base font-bold tracking-tight text-foreground">
+              <Heading
+                id={headingId}
+                className="flex items-center gap-2 font-display text-base font-bold tracking-tight text-foreground"
+              >
+                {icon}
                 {title}
               </Heading>
             ) : null}
@@ -52,7 +70,7 @@ export function Panel({
           {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
         </header>
       ) : null}
-      <div className={cn("px-4 py-4 sm:px-5", bodyClassName)}>{children}</div>
+      {children ? <div className={cn("px-4 py-4 sm:px-5", bodyClassName)}>{children}</div> : null}
       {footer ? <footer className="border-t border-border/70 px-4 py-3 sm:px-5">{footer}</footer> : null}
     </section>
   );
