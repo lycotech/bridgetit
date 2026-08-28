@@ -596,7 +596,7 @@ function SavingsSection() {
  * investments.ts: a commitment is recorded, not transferred, and the
  * portfolio snapshot reports real numbers with no fabricated return figure.
  */
-function InvestmentSection() {
+export function InvestmentSection() {
   const commitments = useInvestmentCommitments(true);
   const portfolio = usePortfolioSnapshot(true);
   const commit = useCreateInvestmentCommitment();

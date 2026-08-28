@@ -13,6 +13,8 @@ import { dateTime } from "@/lib/platform/format";
 import type { AuditLog, Role } from "@/lib/platform/models";
 import { ROLE_LIST, roleMeta } from "@/lib/platform/roles";
 import { useAuth } from "@/lib/auth/auth-context";
+import { LiveModeTabs } from "@/components/operations/LiveModeTabs";
+import RealAuditLogs from "@/pages/admin/portal/AuditLogs";
 
 const FEE_OPTIONS = ["2.5%", "3.0%", "3.5%", "4.0%"];
 const SHARE_OPTIONS = ["30%", "40%", "50%", "60%"];
@@ -195,38 +197,45 @@ export default function OperationsSettingsPage() {
         </div>
       </Panel>
 
-      <DataTable
-        rows={logs.data ?? []}
-        columns={columns}
-        getRowId={(row) => row.id}
-        caption="Each platform setting, with its current value and when it was last changed"
-        search={(row) => `${row.actor} ${row.actorRole} ${row.action} ${row.entity} ${row.ip}`}
-        searchPlaceholder="Search the audit log by actor, action or entity"
-        filters={[
-          {
-            key: "actorRole",
-            label: "Role",
-            options: Array.from(new Set((logs.data ?? []).map((row) => row.actorRole))),
-            accessor: (row) => row.actorRole,
-          },
-        ]}
-        dateAccessor={(row) => row.at}
-        isLoading={logs.isLoading}
-        isError={logs.isError}
-        onRetry={() => void logs.refetch()}
-        emptyTitle="No audit entries yet"
-        emptyBody="Every internal action is recorded here with the actor, role, entity and IP address."
-        initialSort={{ key: "at", direction: "desc" }}
-        pageSize={12}
-        exportName="paybridge-audit-log"
-        exportRow={(row) => ({
-          Actor: row.actor,
-          Role: row.actorRole,
-          Action: row.action,
-          Entity: row.entity,
-          When: dateTime(row.at),
-          IP: row.ip,
-        })}
+      <LiveModeTabs
+        gateTitle="Staff credentials required"
+        gateDescription="Sign in with your PayBridge staff account to see the real, append-only audit trail instead of demo data."
+        live={<RealAuditLogs />}
+        demo={
+          <DataTable
+            rows={logs.data ?? []}
+            columns={columns}
+            getRowId={(row) => row.id}
+            caption="Each platform setting, with its current value and when it was last changed"
+            search={(row) => `${row.actor} ${row.actorRole} ${row.action} ${row.entity} ${row.ip}`}
+            searchPlaceholder="Search the audit log by actor, action or entity"
+            filters={[
+              {
+                key: "actorRole",
+                label: "Role",
+                options: Array.from(new Set((logs.data ?? []).map((row) => row.actorRole))),
+                accessor: (row) => row.actorRole,
+              },
+            ]}
+            dateAccessor={(row) => row.at}
+            isLoading={logs.isLoading}
+            isError={logs.isError}
+            onRetry={() => void logs.refetch()}
+            emptyTitle="No audit entries yet"
+            emptyBody="Every internal action is recorded here with the actor, role, entity and IP address."
+            initialSort={{ key: "at", direction: "desc" }}
+            pageSize={12}
+            exportName="paybridge-audit-log"
+            exportRow={(row) => ({
+              Actor: row.actor,
+              Role: row.actorRole,
+              Action: row.action,
+              Entity: row.entity,
+              When: dateTime(row.at),
+              IP: row.ip,
+            })}
+          />
+        }
       />
 
       <Modal

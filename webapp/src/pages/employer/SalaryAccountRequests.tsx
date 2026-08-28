@@ -9,6 +9,8 @@ import { employerApi, qk } from "@/lib/platform/mock-service";
 import { shortDate, salaryAccountStatusLabel } from "@/lib/platform/format";
 import { useAccountId } from "@/lib/platform/use-account";
 import type { SalaryAccountRequest } from "@/lib/platform/models";
+import { LiveModeTabs } from "@/components/employer/LiveModeTabs";
+import RealSalaryAccountRequests from "@/pages/employer-portal/SalaryAccountRequests";
 
 const FLOW_STAGES = [
   "Employer Payroll System",
@@ -109,21 +111,30 @@ export default function SalaryAccountRequestsPage() {
         }
       />
 
-      <ExistingPayrollModel />
+      <LiveModeTabs
+        gateTitle="Company sign-in required"
+        gateDescription="Sign in to your company's PayBridge account to see your real Salary Account requests instead of demo data."
+        live={<RealSalaryAccountRequests />}
+        demo={
+          <>
+            <ExistingPayrollModel />
 
-      <Panel title="Requests">
-        <DataTable
-          rows={requests.data ?? []}
-          columns={columns}
-          getRowId={(row) => row.id}
-          caption="Salary Account change requests"
-          isLoading={requests.isLoading}
-          isError={requests.isError}
-          onRetry={() => void requests.refetch()}
-          emptyTitle="No Salary Account requests yet"
-          emptyBody="Requests appear here as employees activate PayBridge Access."
-        />
-      </Panel>
+            <Panel title="Requests">
+              <DataTable
+                rows={requests.data ?? []}
+                columns={columns}
+                getRowId={(row) => row.id}
+                caption="Salary Account change requests"
+                isLoading={requests.isLoading}
+                isError={requests.isError}
+                onRetry={() => void requests.refetch()}
+                emptyTitle="No Salary Account requests yet"
+                emptyBody="Requests appear here as employees activate PayBridge Access."
+              />
+            </Panel>
+          </>
+        }
+      />
     </div>
   );
 }

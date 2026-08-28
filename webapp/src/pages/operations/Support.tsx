@@ -15,6 +15,8 @@ import { dateTime, relativeTime } from "@/lib/platform/format";
 import { TICKET_STATUSES } from "@/lib/platform/models";
 import type { SupportTicket, TicketStatus } from "@/lib/platform/models";
 import { useActorName } from "@/lib/platform/use-account";
+import { LiveModeTabs } from "@/components/operations/LiveModeTabs";
+import RealSupportRequests from "@/pages/admin/portal/SupportRequests";
 
 const PRIORITIES = ["Low", "Normal", "High", "Urgent"] as const;
 const REQUESTER_TYPES = ["Employee", "Employer", "Investor"] as const;
@@ -101,131 +103,140 @@ export default function OperationsSupportPage() {
         description="Every question from employees, employers and investors in one place."
       />
 
-      <StatGrid columns={4}>
-        <StatCard label="Open" value={String(open.length)} tone="primary" />
-        <StatCard label="Escalated" value={String(escalated.length)} tone="attention" />
-        <StatCard label="Waiting on customer" value={String(waiting.length)} />
-        <StatCard
-          label="Resolved"
-          value={String(rows.filter((row) => row.status === "Resolved").length)}
-          tone="protected"
-        />
-      </StatGrid>
-
-      <DataTable
-        rows={rows}
-        columns={columns}
-        getRowId={(row) => row.id}
-        caption="Each support case, with the customer, the channel it arrived on, its priority and its stage"
-        search={(row) => `${row.reference} ${row.subject} ${row.requester} ${row.requesterType} ${row.status}`}
-        searchPlaceholder="Search by ticket, reference or requester"
-        filters={[
-          { key: "status", label: "Status", options: TICKET_STATUSES, accessor: (row) => row.status },
-          { key: "priority", label: "Priority", options: PRIORITIES, accessor: (row) => row.priority },
-          { key: "type", label: "Requester", options: REQUESTER_TYPES, accessor: (row) => row.requesterType },
-          { key: "channel", label: "Channel", options: CHANNELS, accessor: (row) => row.channel },
-        ]}
-        dateAccessor={(row) => row.createdAt}
-        isLoading={tickets.isLoading}
-        isError={tickets.isError}
-        onRetry={() => void tickets.refetch()}
-        emptyTitle="Nothing in the queue"
-        emptyBody="New tickets from any portal appear here immediately."
-        onRowClick={(row) => {
-          setSelected(row);
-          setStatus(row.status);
-          setReply("");
-        }}
-        initialSort={{ key: "subject", direction: "desc" }}
-        exportName="paybridge-support-tickets"
-        exportRow={(row) => ({
-          Reference: row.reference,
-          Subject: row.subject,
-          Requester: row.requester,
-          Type: row.requesterType,
-          Channel: row.channel,
-          Priority: row.priority,
-          Status: row.status,
-          Opened: dateTime(row.createdAt),
-          Updated: dateTime(row.updatedAt),
-        })}
-      />
-
-      <Modal
-        open={Boolean(selected)}
-        onClose={() => setSelected(null)}
-        title={selected?.subject ?? "Ticket"}
-        description={selected ? `${selected.reference} · ${selected.requester}` : undefined}
-        size="wide"
-        footer={
+      <LiveModeTabs
+        gateTitle="Staff credentials required"
+        gateDescription="Sign in with your PayBridge staff account to see the real support queue instead of demo data."
+        live={<RealSupportRequests />}
+        demo={
           <>
-            <div className="mr-auto w-48">
-              <SelectField
-                label=""
-                value={status}
-                onChange={(value) => {
-                  setStatus(value as TicketStatus);
-                  changeStatus.mutate(value as TicketStatus);
-                }}
-                options={TICKET_STATUSES.map((value) => ({ value, label: value }))}
+            <StatGrid columns={4}>
+              <StatCard label="Open" value={String(open.length)} tone="primary" />
+              <StatCard label="Escalated" value={String(escalated.length)} tone="attention" />
+              <StatCard label="Waiting on customer" value={String(waiting.length)} />
+              <StatCard
+                label="Resolved"
+                value={String(rows.filter((row) => row.status === "Resolved").length)}
+                tone="protected"
               />
-            </div>
-            <ActionButton
-              loading={sendReply.isPending}
-              disabled={reply.trim().length < 4}
-              icon={<Send className="h-4 w-4" />}
-              onClick={() => sendReply.mutate()}
-            >
-              Send reply
-            </ActionButton>
-          </>
-        }
-      >
-        {selected ? (
-          <div className="space-y-5">
-            <div className="divide-y divide-border/70">
-              <SummaryRow label="Requester" value={`${selected.requester} · ${selected.requesterType}`} />
-              <SummaryRow label="Channel" value={selected.channel} />
-              <SummaryRow label="Priority" value={<StatusBadge status={selected.priority} />} />
-              <SummaryRow label="Status" value={<StatusBadge status={selected.status} />} />
-              <SummaryRow label="Opened" value={dateTime(selected.createdAt)} />
-              <SummaryRow label="Last update" value={dateTime(selected.updatedAt)} />
-            </div>
+            </StatGrid>
 
-            <ul className="space-y-3">
-              {selected.messages.map((message) => (
-                <li
-                  key={message.id}
-                  className={
-                    message.authorType === "PayBridge"
-                      ? "ml-auto max-w-[85%] rounded-2xl rounded-br-md border border-primary/30 bg-primary/8 p-3.5"
-                      : "max-w-[85%] rounded-2xl rounded-bl-md border border-border bg-secondary/50 p-3.5"
-                  }
-                >
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {message.author} · {relativeTime(message.at)}
-                  </p>
-                  <p className="mt-1.5 text-sm leading-relaxed text-foreground">{message.body}</p>
-                </li>
-              ))}
-            </ul>
-
-            <TextAreaField
-              label="Reply to the customer"
-              value={reply}
-              onChange={setReply}
-              rows={4}
-              placeholder="Answer the question in plain language."
-              hint="Never ask a customer for their bank password, card PIN or a one-time code."
+            <DataTable
+              rows={rows}
+              columns={columns}
+              getRowId={(row) => row.id}
+              caption="Each support case, with the customer, the channel it arrived on, its priority and its stage"
+              search={(row) => `${row.reference} ${row.subject} ${row.requester} ${row.requesterType} ${row.status}`}
+              searchPlaceholder="Search by ticket, reference or requester"
+              filters={[
+                { key: "status", label: "Status", options: TICKET_STATUSES, accessor: (row) => row.status },
+                { key: "priority", label: "Priority", options: PRIORITIES, accessor: (row) => row.priority },
+                { key: "type", label: "Requester", options: REQUESTER_TYPES, accessor: (row) => row.requesterType },
+                { key: "channel", label: "Channel", options: CHANNELS, accessor: (row) => row.channel },
+              ]}
+              dateAccessor={(row) => row.createdAt}
+              isLoading={tickets.isLoading}
+              isError={tickets.isError}
+              onRetry={() => void tickets.refetch()}
+              emptyTitle="Nothing in the queue"
+              emptyBody="New tickets from any portal appear here immediately."
+              onRowClick={(row) => {
+                setSelected(row);
+                setStatus(row.status);
+                setReply("");
+              }}
+              initialSort={{ key: "subject", direction: "desc" }}
+              exportName="paybridge-support-tickets"
+              exportRow={(row) => ({
+                Reference: row.reference,
+                Subject: row.subject,
+                Requester: row.requester,
+                Type: row.requesterType,
+                Channel: row.channel,
+                Priority: row.priority,
+                Status: row.status,
+                Opened: dateTime(row.createdAt),
+                Updated: dateTime(row.updatedAt),
+              })}
             />
 
-            <InfoNote>
-              Support can see amounts, dates and statuses. A customer's reasons for a request stay private
-              unless they tell you themselves.
-            </InfoNote>
-          </div>
-        ) : null}
-      </Modal>
+            <Modal
+              open={Boolean(selected)}
+              onClose={() => setSelected(null)}
+              title={selected?.subject ?? "Ticket"}
+              description={selected ? `${selected.reference} · ${selected.requester}` : undefined}
+              size="wide"
+              footer={
+                <>
+                  <div className="mr-auto w-48">
+                    <SelectField
+                      label=""
+                      value={status}
+                      onChange={(value) => {
+                        setStatus(value as TicketStatus);
+                        changeStatus.mutate(value as TicketStatus);
+                      }}
+                      options={TICKET_STATUSES.map((value) => ({ value, label: value }))}
+                    />
+                  </div>
+                  <ActionButton
+                    loading={sendReply.isPending}
+                    disabled={reply.trim().length < 4}
+                    icon={<Send className="h-4 w-4" />}
+                    onClick={() => sendReply.mutate()}
+                  >
+                    Send reply
+                  </ActionButton>
+                </>
+              }
+            >
+              {selected ? (
+                <div className="space-y-5">
+                  <div className="divide-y divide-border/70">
+                    <SummaryRow label="Requester" value={`${selected.requester} · ${selected.requesterType}`} />
+                    <SummaryRow label="Channel" value={selected.channel} />
+                    <SummaryRow label="Priority" value={<StatusBadge status={selected.priority} />} />
+                    <SummaryRow label="Status" value={<StatusBadge status={selected.status} />} />
+                    <SummaryRow label="Opened" value={dateTime(selected.createdAt)} />
+                    <SummaryRow label="Last update" value={dateTime(selected.updatedAt)} />
+                  </div>
+
+                  <ul className="space-y-3">
+                    {selected.messages.map((message) => (
+                      <li
+                        key={message.id}
+                        className={
+                          message.authorType === "PayBridge"
+                            ? "ml-auto max-w-[85%] rounded-2xl rounded-br-md border border-primary/30 bg-primary/8 p-3.5"
+                            : "max-w-[85%] rounded-2xl rounded-bl-md border border-border bg-secondary/50 p-3.5"
+                        }
+                      >
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          {message.author} · {relativeTime(message.at)}
+                        </p>
+                        <p className="mt-1.5 text-sm leading-relaxed text-foreground">{message.body}</p>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <TextAreaField
+                    label="Reply to the customer"
+                    value={reply}
+                    onChange={setReply}
+                    rows={4}
+                    placeholder="Answer the question in plain language."
+                    hint="Never ask a customer for their bank password, card PIN or a one-time code."
+                  />
+
+                  <InfoNote>
+                    Support can see amounts, dates and statuses. A customer's reasons for a request stay private
+                    unless they tell you themselves.
+                  </InfoNote>
+                </div>
+              ) : null}
+            </Modal>
+          </>
+        }
+      />
     </div>
   );
 }

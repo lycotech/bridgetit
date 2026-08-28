@@ -15,6 +15,8 @@ import { naira, nairaCompact, ratioPct, shortDate } from "@/lib/platform/format"
 import { EMPLOYER_APPLICATION_STATUSES, RISK_LEVELS } from "@/lib/platform/models";
 import type { Employer, EmployerApplicationStatus } from "@/lib/platform/models";
 import { useActorName } from "@/lib/platform/use-account";
+import { LiveModeTabs } from "@/components/operations/LiveModeTabs";
+import RealCreditRisk from "@/pages/admin/portal/CreditRisk";
 
 const ONBOARDING_STEPS = ["Application", "Documents", "Review", "Credit assessment", "Live"];
 
@@ -133,6 +135,12 @@ export default function OperationsEmployersPage() {
         description="Review applications, set approved limits and manage the status of every employer on the platform."
       />
 
+      <LiveModeTabs
+        gateTitle="Staff credentials required"
+        gateDescription="Sign in with your PayBridge staff account to see the real employer risk register instead of demo data."
+        live={<RealCreditRisk />}
+        demo={
+          <>
       <StatGrid columns={4}>
         <StatCard label="Employers live" value={String(approved.length)} tone="primary" />
         <StatCard label="In the queue" value={String(inQueue.length)} tone="attention" hint="Awaiting a decision" />
@@ -305,6 +313,9 @@ export default function OperationsEmployersPage() {
           options={EMPLOYER_APPLICATION_STATUSES.map((value) => ({ value, label: value }))}
         />
       </ConfirmDialog>
+          </>
+        }
+      />
     </div>
   );
 }

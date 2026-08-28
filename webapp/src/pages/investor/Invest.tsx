@@ -14,6 +14,8 @@ import { investorApi, qk } from "@/lib/platform/mock-service";
 import { naira, pct, shortDate } from "@/lib/platform/format";
 import type { Portfolio } from "@/lib/platform/models";
 import { useAccountId } from "@/lib/platform/use-account";
+import { LiveModeTabs } from "@/components/investor/LiveModeTabs";
+import { InvestmentSection } from "@/pages/account/AccountHome";
 
 const STEPS = ["Choose mandate", "Amount", "Review", "Confirm"];
 
@@ -73,6 +75,12 @@ export default function InvestorInvestPage() {
         description="Choose a mandate, commit capital, and PayBridge's investment manager deploys it."
       />
 
+      <LiveModeTabs
+        gateTitle="Account sign-in required"
+        gateDescription="Sign in to your real PayBridge account to commit real capital instead of a demo mandate."
+        live={<InvestmentSection />}
+        demo={
+          <>
       <AsyncPanel query={overview}>
         {(data) => (
           <div className="grid gap-6 lg:grid-cols-3">
@@ -295,6 +303,9 @@ export default function InvestorInvestPage() {
           </div>
         ) : null}
       </Modal>
+          </>
+        }
+      />
     </div>
   );
 }

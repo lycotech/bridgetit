@@ -14,6 +14,8 @@ import { nairaCompact, ratioPct, relativeTime, shortDate } from "@/lib/platform/
 import { RISK_LEVELS } from "@/lib/platform/models";
 import type { RiskAlert } from "@/lib/platform/models";
 import { useActorName } from "@/lib/platform/use-account";
+import { LiveModeTabs } from "@/components/operations/LiveModeTabs";
+import RealCreditRisk from "@/pages/admin/portal/CreditRisk";
 
 const ALERT_STATUSES = ["Open", "Monitoring", "Mitigated", "Closed"] as const;
 const ENTITY_TYPES = ["Employer", "Employee", "Investor", "Portfolio", "Transaction"] as const;
@@ -92,6 +94,12 @@ export default function OperationsRiskPage() {
         description="Where the platform is carrying the most risk, and what is being done about it."
       />
 
+      <LiveModeTabs
+        gateTitle="Staff credentials required"
+        gateDescription="Sign in with your PayBridge staff account to see the real credit-risk engine instead of demo data."
+        live={<RealCreditRisk />}
+        demo={
+          <>
       <StatGrid columns={4}>
         <StatCard label="Open alerts" value={String(open.length)} tone="attention" />
         <StatCard label="High or critical" value={String(critical.length)} tone="attention" />
@@ -221,6 +229,9 @@ export default function OperationsRiskPage() {
           options={ALERT_STATUSES.map((value) => ({ value, label: value }))}
         />
       </ConfirmDialog>
+          </>
+        }
+      />
     </div>
   );
 }

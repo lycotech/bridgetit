@@ -14,6 +14,8 @@ import { longDate, naira, pct, shortDate } from "@/lib/platform/format";
 import { EMPLOYMENT_STATUSES, KYC_STATUSES } from "@/lib/platform/models";
 import type { EmployerEmployeeRecord } from "@/lib/platform/models";
 import { useAccountId } from "@/lib/platform/use-account";
+import { LiveModeTabs } from "@/components/employer/LiveModeTabs";
+import RealEmployerPayroll from "@/pages/employer-portal/Payroll";
 
 export default function EmployerEmployeesPage() {
   const employerId = useAccountId("employer");
@@ -108,6 +110,12 @@ export default function EmployerEmployeesPage() {
         description="Employment and payroll facts you already own. Eligibility is entirely yours to control."
       />
 
+      <LiveModeTabs
+        gateTitle="Company sign-in required"
+        gateDescription="Sign in to your company's PayBridge account to see your real employee roster instead of demo data."
+        live={<RealEmployerPayroll />}
+        demo={
+          <>
       <StatGrid columns={4}>
         <StatCard label="On payroll" value={String(rows.length)} icon={<Users className="h-4 w-4" />} />
         <StatCard label="Access active" value={String(eligibleCount)} tone="protected" />
@@ -253,6 +261,9 @@ export default function EmployerEmployeesPage() {
         loading={setEligibility.isPending}
         onConfirm={() =>
           confirming && setEligibility.mutate({ id: confirming.id, eligible: !confirming.eligible })
+        }
+      />
+          </>
         }
       />
     </div>

@@ -11,6 +11,8 @@ import { AsyncPanel } from "@/components/dashboard/states";
 import { employerApi, qk } from "@/lib/platform/mock-service";
 import { dateTime, salaryAccountStatusLabel } from "@/lib/platform/format";
 import { useAccountId } from "@/lib/platform/use-account";
+import { LiveModeTabs } from "@/components/employer/LiveModeTabs";
+import RealSalaryAccountRequestReview from "@/pages/employer-portal/SalaryAccountRequestReview";
 
 const UNCHANGED = [
   "Salary calculation",
@@ -84,6 +86,11 @@ export default function SalaryAccountRequestReviewPage() {
         }
       />
 
+      <LiveModeTabs
+        gateTitle="Company sign-in required"
+        gateDescription="Sign in to your company's PayBridge account to review this request with real data instead of demo data."
+        live={<RealSalaryAccountRequestReview />}
+        demo={
       <AsyncPanel query={request}>
         {(data) =>
           data.status === "pending_review" ? (
@@ -284,6 +291,8 @@ export default function SalaryAccountRequestReviewPage() {
           )
         }
       </AsyncPanel>
+        }
+      />
     </div>
   );
 }

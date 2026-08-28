@@ -15,6 +15,8 @@ import { employerApi, qk } from "@/lib/platform/mock-service";
 import { dateTime, naira, pct, shortDate } from "@/lib/platform/format";
 import type { PayrollRun } from "@/lib/platform/models";
 import { useAccountId, useActorName } from "@/lib/platform/use-account";
+import { LiveModeTabs } from "@/components/employer/LiveModeTabs";
+import RealEmployerPayroll from "@/pages/employer-portal/Payroll";
 
 const PERIODS = ["July 2026", "August 2026", "September 2026"];
 const KINDS = ["Payroll", "Accrued salary"] as const;
@@ -150,6 +152,12 @@ export default function EmployerPayrollPage() {
         }
       />
 
+      <LiveModeTabs
+        gateTitle="Company sign-in required"
+        gateDescription="Sign in to your company's PayBridge account to see your real payroll cycles instead of demo data."
+        live={<RealEmployerPayroll />}
+        demo={
+          <>
       <AsyncPanel query={overview}>
         {(data) => {
           const fundedPct = data.employer.payrollObligation
@@ -334,6 +342,9 @@ export default function EmployerPayrollPage() {
           </InfoNote>
         </div>
       </Modal>
+          </>
+        }
+      />
     </div>
   );
 }

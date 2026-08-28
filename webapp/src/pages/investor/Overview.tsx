@@ -10,6 +10,8 @@ import { InvestorDisclosure } from "@/components/investor/Disclosures";
 import { investorApi, qk } from "@/lib/platform/mock-service";
 import { naira, nairaCompact, pct, shortDate } from "@/lib/platform/format";
 import { useAccountId } from "@/lib/platform/use-account";
+import { LiveModeTabs } from "@/components/investor/LiveModeTabs";
+import { InvestmentSection } from "@/pages/account/AccountHome";
 
 export default function InvestorOverviewPage() {
   const investorId = useAccountId("investor");
@@ -29,6 +31,11 @@ export default function InvestorOverviewPage() {
         actions={<ActionButton to="/investor/invest">Commit capital</ActionButton>}
       />
 
+      <LiveModeTabs
+        gateTitle="Account sign-in required"
+        gateDescription="Sign in to your real PayBridge account to see your real committed capital and portfolio snapshot instead of demo data."
+        live={<InvestmentSection />}
+        demo={
       <AsyncPanel query={overview}>
         {(data) => {
           const investor = data.investor;
@@ -166,6 +173,8 @@ export default function InvestorOverviewPage() {
           );
         }}
       </AsyncPanel>
+        }
+      />
     </div>
   );
 }

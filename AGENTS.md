@@ -95,11 +95,11 @@ link), `POST /:userId/decision` (approve/reject, gated on `kyc.decide`). Real UI
 | Risk approval | ✅ (2026-08-01) — see §2; most decisions still blocked pending real authority thresholds |
 | Treasury funding | ✅ (2026-08-02) |
 | Payroll repayment | ❌ |
-| Employer dashboard | ❌ mock UI only (`/employer/*`); real employer functionality lives at the separate `/employer-portal/*` — see §2 |
+| Employer dashboard | ⚠️ Partial (2026-08-28) — Employees, Payroll and both Salary Account Requests pages each gained a real "Live data" tab reading `/employer-portal/*` (see §11); demo data stays the default. CommandCentre, Exceptions, Integrations, PayBridgePayroll, SalaryBuffer, BridgeActivity, Repayments, Reports, Settings remain mock-only. |
 | Employee dashboard | ❌ mock UI only (`/employee/*`); real employee functionality (eligibility, Bridge, savings, investments) lives on the real `/account` page — see §2 |
-| Operations dashboard | ❌ mock UI only (its "Risk" page still reads simulated data — the real engine is wired at `/admin/risk` in the admin portal, a separate page from the mock ops dashboard) |
+| Operations dashboard | ⚠️ Partial (2026-08-28) — Support, Risk, Employers, Settings' audit log, and Reports each gained a real "Live data" tab (see §11); demo data stays the default so the prospect walkthrough is unchanged. Employees, Investors, Transactions, Funding, Portfolios, PayrollOps, Reconciliation, Compliance remain mock-only — no real backend concept to attach to yet. |
 | Admin console | ✅ real, working today |
-| Basic investor dashboard | ⚠️ Partial (2026-08-02) — real commitment ledger + real portfolio snapshot on `/account` for investor accounts (see §2, Investments); the polished mock `investor/*` demo portal is untouched |
+| Basic investor dashboard | ⚠️ Partial (2026-08-28) — real commitment ledger + real portfolio snapshot on `/account` for investor accounts (see §2, Investments); `investor/Overview.tsx` and `investor/Invest.tsx` in the polished mock portal each gained a real "Live data" tab reusing that same panel (see §11); the rest of the mock `investor/*` portal (Performance, Transactions, Statements, Withdrawals, Documents, Profile) is untouched — no real yield/statement/KYB backend exists |
 
 ## 5. Known live-environment issues
 
@@ -186,20 +186,33 @@ tick items off here as they land rather than treating this as a static plan.
 ## 8. Website copy — pending brand/positioning update (added 2026-08-10)
 
 Full target copy lives in **[WEBSITE_COPY_BRIEF.md](WEBSITE_COPY_BRIEF.md)** — implement from
-there, not from this summary. Status: **not started**, pure copy/positioning brief received, no
-implementation yet. Core shift: PayBridge must stop reading like a second payroll system —
-it works around an employer's existing payroll, and employees keep their existing bank.
+there, not from this summary. Status: **✅ complete (2026-08-28)** — all 17 items in the ordered
+TODO below are done, including the final QA pass. Core shift: PayBridge must stop reading like a
+second payroll system — it works around an employer's existing payroll, and employees keep their
+existing bank.
 
-**Structural conflicts found while grounding the brief against the live code** (not just copy
-swaps — need a product/design decision before implementing):
+**Structural conflicts found while grounding the brief against the live code** (resolved — kept
+here as a record of the reasoning, not an open decision):
 
-- **Primary tagline conflict.** The brief demotes "From payroll to prosperity" to a secondary
-  expression and wants "Financial wellbeing, built around work." as the lead. But "From payroll
-  to prosperity" is currently the *primary* brand lockup, drawn into the logomark itself, not
-  just page copy: `webapp/src/lib/brand.ts:46-49` (`TAGLINE`/`TAGLINE_LOCKUP`),
-  `components/brand/Logo.tsx`, `components/brand/Tagline.tsx`, `components/brand/SectionLabel.tsx`,
-  and `components/sections/Manifesto.tsx` (a whole section built around animating this phrase).
-  This is a brand-design change, not a text edit.
+- **Primary tagline conflict — resolved (2026-08-28), no design change needed.** Re-audited where
+  the illustrated lockup (`Logo` with `withTagline`, the SVG geometry that actually spells out
+  "From payroll to prosperity" in vector rules) is used sitewide: only `components/sections/
+  Manifesto.tsx` (the homepage's closing section, after every other section including the CTA
+  build-up — its own comment already calls it "the closing beat of the page") and `pages/Brand.tsx`
+  (the internal brand style-guide page, not public marketing). Every header/nav/footer usage across
+  the whole app (`Navbar.tsx`, `Footer.tsx`, `DashboardShell.tsx`, `AuthLayout.tsx`, all portal
+  shells, etc.) already renders the plain `<Logo />` with no tagline. The Hero already leads with
+  "Financial wellbeing, built around work." (`Hero.tsx`'s `SectionLabel`), and `index.html`'s
+  title/meta description/OG/Twitter tags lead with "You Work Every Day. Why Wait Until Payday?" —
+  none of the public-facing lead surfaces use the old tagline. So structurally this was already
+  secondary use, not primary; no vector-art redesign was required. The one place still worth fixing
+  was non-visual: `public/site.webmanifest`'s `description` field (shown in PWA install prompts/app
+  switchers) and its generator `scripts/build-brand.mjs` both still had `"From payroll to
+  prosperity."` as the summary line — updated both to `"Financial wellbeing, built around work."`
+  so they match the new lead line. `lib/brand.ts`'s `TAGLINE`/`TAGLINE_LOCKUP` constants, the
+  `Tagline.tsx` footer component, and the JSON-LD `slogan` field in `index.html` were left as-is —
+  a footer line and a schema.org `slogan` field are exactly what "secondary expression" describes,
+  not the lead promise.
 - **Pillar naming mismatch — resolved (2026-08-11).** User decided: renamed
   `components/sections/BeyondBridge.tsx`'s pillars Bridge/Build/Grow → Access/Save/Invest and
   added a fourth Learn tile. See item 9-11 below for detail.
@@ -300,8 +313,10 @@ in-app "Bridge ₦X" transaction label stays):**
     state). Also checked `components/registration/fields.tsx`'s `NoDocumentsNotice` component —
     its *name* contains the phrase but its rendered copy is already honest/hedged ("verification
     happens later... once your employer activates PayBridge"); nothing user-facing to change.
-13. ⬜ Demote "From payroll to prosperity" to secondary use only (brief §13) — see tagline
-    conflict above; needs design sign-off since it's drawn into the logomark.
+13. ✅ Demote "From payroll to prosperity" to secondary use only (brief §13, 2026-08-28) — see the
+    resolved tagline conflict above. No design/logomark change was needed; the illustrated lockup
+    was already confined to secondary placements. Fixed the one non-visual place it still read as
+    the lead line (`public/site.webmanifest` + its generator). Typecheck passes.
 14. ✅ Employer value prop as four explicit benefits (brief §14, 2026-08-11) — net-new
     `components/sections/EmployerBenefits.tsx`, the brief's exact four benefits as icon cards,
     wired into `pages/Index.tsx` right after `BeyondBridge` and before the sections that dive
@@ -340,8 +355,22 @@ in-app "Bridge ₦X" transaction label stays):**
     the item 13 tagline conflict still on hold. Nav anchor links (`#why`, `#how`, `#who`, `#trust`,
     `#faqs`) scroll by ID and don't depend on document order, so the reorder doesn't break them.
     Typecheck passes.
-17. ⬜ Final QA: confirm the five core messages (brief "Core message" section) are legible within
-    two minutes of landing on the homepage.
+17. ✅ Final QA (2026-08-28): confirm the five core messages (brief "The five things a visitor must
+    understand within two minutes") are legible on the homepage. Content/order audit (no browser
+    available in this session, per the environment note in §5a-adjacent tooling — verified by
+    reading rendered section copy and `pages/Index.tsx`'s section order, not a live click-through):
+    all five are stated explicitly, and four of the five are already in the Hero's first fold —
+    (1) "employer-enabled" platform → Hero's `SectionLabel` ("Financial wellbeing, built around
+    work.") plus the "Employer-enabled · Verified earnings · Approved limits apply" microcopy line;
+    (2) access part of verified earned income when eligible → Hero body copy verbatim; (3)
+    employers shouldn't run another payroll → Hero's "For employers" callout ("One payroll process,
+    less salary-advance administration...") and unpacked further in `OnePayroll.tsx`; (4) employees
+    keep their existing bank → Hero's "For employees" callout ("...without abandoning your existing
+    bank") and unpacked further in `PayBridgeAccount.tsx`; (5) PayBridge extends beyond Access into
+    Save/Invest/Learn → `BeyondBridge.tsx`'s four pillar tiles, the 4th section on the page. No
+    message requires scrolling past `BeyondBridge` to first encounter, well inside a two-minute
+    read. Worth a real click-through next time the app is run, to confirm visual hierarchy (not
+    just copy presence) reads the same way — this pass covers copy, not layout/rendering.
 
 ### Engineering dependencies this copy update exposes
 
@@ -501,6 +530,122 @@ descoped by the user rather than built — the demo stays invite-only.
   as rules-based, not a live AI call — everything shown is computed from the employee's own
   overview numbers and the existing product rates, same honesty bar as `Savings.tsx`, with the
   same "illustrative, not a guaranteed return" disclosure the products already carry.
+
+## 11. Operations demo dashboard — real "Live data" tabs (2026-08-28)
+
+Started rewiring the three remaining mock dashboards (employer, investor, operations — the last
+item on the standing punch list) to their real counterparts, operations first per user decision.
+
+**The blocker that shaped this, and how it was resolved.** `/operations/*` is reachable through
+the exact same instant demo login (`signInAsDemo`, `RequireDemoAccess`) that prospects use for the
+employer/investor walkthroughs — there is no separate "this viewer is real staff" boundary. Wiring
+the mock pages straight to `/api/admin/*` would have meant any demo guest could see real
+registrant PII and real KYC submissions (confirmed live in the database — this app is pre-launch
+for money but not for personal data; see §5's live-environment notes). The user's explicit call:
+**keep the demo fully functional for prospects, and add real data on top rather than replacing
+mock data with it.**
+
+**What was built.** A new `components/operations/LiveModeTabs.tsx` splits each rewired page into
+two tabs: **Demo data** (the existing mock content, byte-for-byte unchanged, still the default tab
+so the prospect walkthrough is untouched) and **Live data**, which wraps the real page behind
+`components/admin/AdminSessionGate.tsx` — the exact inline staff-login gate `operations/
+DemoAccess.tsx` already used for issuing demo invitations, reused here for viewing data instead.
+No new auth system was built: the legacy env-admin login behind that gate is treated server-side
+(`backend/src/security/staff-session.ts`) as a break-glass Super Admin session, so it already
+satisfies every `requireAdminPermission()` check the real routes below make.
+
+Rather than reshape real API responses into each mock page's bespoke table/column config, the Live
+tab renders the **actual real admin page component** from `pages/admin/portal/*` directly — those
+already share the same `@/components/dashboard/*` design system the mock pages use, so they drop
+in without a visual seam:
+
+| Mock page | Live tab renders | Real route it mirrors |
+|---|---|---|
+| `operations/Support.tsx` | `admin/portal/SupportRequests.tsx` | `/admin/support`, `admin-support.ts` |
+| `operations/Risk.tsx` | `admin/portal/CreditRisk.tsx` | `/admin/risk`, `admin-risk.ts` |
+| `operations/Employers.tsx` | `admin/portal/CreditRisk.tsx` (same page — the real employer list with limits/tiers lives there, not in a separate real "Employers" screen) | `/admin/risk` |
+| `operations/Settings.tsx` | `admin/portal/AuditLogs.tsx`, swapped in for just the audit-log `DataTable` at the bottom of the page — the fee/automation/internal-access panels above it stay mock (§ decision below) | `/admin/audit`, `admin-audit.ts` |
+| `operations/Reports.tsx` | `admin/portal/Reports.tsx` | `/admin/reports`, `admin-reports.ts` |
+
+All five typecheck and lint clean (`npx tsc --noEmit -p tsconfig.app.json`, `eslint`).
+
+**Left on mock data, deliberately, this round:** `operations/Employees.tsx`, `Investors.tsx`,
+`Transactions.tsx`, `Funding.tsx`, `Portfolios.tsx`, `PayrollOps.tsx`, `Reconciliation.tsx`,
+`Compliance.tsx`, and the non-audit parts of `Settings.tsx` (service fee, auto-disburse/auto-match
+toggles, "invite a colleague"). None of these has a real backend concept to attach to yet — per
+the user's earlier decision for no-backend pages, they stay mock and are not being visually
+relabeled as demo-only in this pass (worth a follow-up: right now the Live/Demo tab pattern above
+makes those five wired pages look more "real" than these untouched ones, with no visual cue
+distinguishing "no live tab exists" from "live tab not yet implemented"). `Reconciliation.tsx` and
+the payroll-deduction side of `Repayments.tsx` (employer tree) remain hard-blocked on the deferred
+Disbursement/Repayment work (§6 item 8).
+
+**Not done, worth a real click-through:** no browser was available in this session to click into
+each Live tab and complete a real staff sign-in end-to-end — verified by typecheck/lint only.
+
+### Employer dashboard batch (2026-08-28, same session)
+
+Same pattern, different gate: the mock `/employer/*` pages don't sit behind a staff session — the
+real data behind them belongs to one company's own account (`EmployerUser`/`Employer`, a separate
+session cookie from admin staff — see `lib/employer/session.ts`, `backend/src/security/
+employer-session.ts`). So rather than reuse `AdminSessionGate`, this batch adds its own sibling
+pair: `components/employer/EmployerCredentialsForm.tsx` (inline email/password + optional TOTP,
+mirroring `AdminCredentialsForm.tsx` but calling `useEmployerLogin()`) and `components/employer/
+EmployerSessionGate.tsx` (mirrors `AdminSessionGate.tsx`, gated on `useEmployerSession()` instead
+of the admin one), plus a sibling `components/employer/LiveModeTabs.tsx` (identical shape to the
+operations one, just wired to the employer gate — kept as a separate small file rather than a
+shared generic component, matching the existing pattern of one gate component per session domain).
+
+| Mock page | Live tab renders | Real route it mirrors |
+|---|---|---|
+| `employer/SalaryAccountRequests.tsx` | `employer-portal/SalaryAccountRequests.tsx` | `/employer-portal/salary-account-requests` |
+| `employer/SalaryAccountRequestReview.tsx` | `employer-portal/SalaryAccountRequestReview.tsx` (same `:id` route param name in both trees, so `useParams` resolves correctly when the real component is rendered inside the mock route) | `/employer-portal/salary-account-requests/:id` |
+| `employer/Payroll.tsx` | `employer-portal/Payroll.tsx` | `/employer-portal/payroll` |
+| `employer/Employees.tsx` | `employer-portal/Payroll.tsx` (same page — the real roster with `eligible`/`kycApproved` flags lives inside the real Payroll page, not a separate real "Employees" screen; same reasoning as pointing the ops mock Employers page at the real CreditRisk page) | `/employer-portal/payroll` |
+
+All four typecheck and lint clean. Left mock this round, same "no real backend concept" reasoning
+as operations: `payroll/CommandCentre.tsx`, `payroll/Exceptions.tsx`, `payroll/Integrations.tsx`,
+`payroll/Records.tsx`, `PayBridgePayroll.tsx`, `SalaryBuffer.tsx`, `BridgeActivity.tsx` (real data
+exists but is staff-only today, not employer-facing — would need a new employer-scoped endpoint),
+`Repayments.tsx` (hard-blocked on deferred Disbursement/Repayment), `Reports.tsx`, `Settings.tsx`.
+
+### Investor demo dashboard batch (2026-08-28, same session) — C is now fully addressed
+
+Weakest of the three, as flagged going in: there is no separate real investor portal or login at
+all. Real investing is one panel (`InvestmentSection`, previously a private function inside
+`pages/account/AccountHome.tsx`, now exported from there) rendered on the real `/account` page for
+`accountType === "investor"` customers — same real customer session `/account` itself uses
+(`lib/account/session.ts`), not a new one.
+
+Added a third gate sibling, `components/investor/InvestorSessionGate.tsx` (+ `InvestorCredentialsForm.tsx`,
+`LiveModeTabs.tsx`), with one extra check the admin/employer gates don't need: real investing needs
+both `accountType === "investor"` AND `gate === "active"` (verified + KYC approved) before
+`/api/investments/*` does anything — signing in with a non-investor or still-verifying real account
+now shows an honest explanation ("not a capital-partner account" / "not yet active") instead of an
+empty or erroring panel.
+
+| Mock page | Live tab renders | Real route it mirrors |
+|---|---|---|
+| `investor/Overview.tsx` | `InvestmentSection` (real portfolio snapshot + commitment list) | `/account`'s Investments panel |
+| `investor/Invest.tsx` | `InvestmentSection` (same panel — the real commit flow is one amount field, not the mock's mandate/portfolio picker) | `/account`'s Investments panel |
+
+Both typecheck and lint clean. Left mock, deliberately, same as the employer/ops batches — no real
+backend exists for any of it: `Performance.tsx` (no yield/return model — explicit non-goal per §2
+Investments), `Statements.tsx` (no statement generator), `Withdrawals.tsx`/`Transactions.tsx` (would
+just re-show the same commitment list `InvestmentSection` already covers, no added value), `Documents.tsx`
+(no investor KYB flow), `Profile.tsx` (no investor-specific profile endpoint).
+
+**With this batch, all three items C named — employer, investor, operations — have at least one
+real "Live data" slice landed**, each following the same Demo/Live tab pattern with a gate matched
+to who actually owns that data (staff session for operations, company session for employer, customer
+session for investor). What's left in each portal is left because no real backend concept exists yet
+for it, not because the wiring pattern doesn't reach it — see the per-batch "left on mock" lists
+above for the full remaining list, and §6 item 8 (Disbursement/Repayment) for the biggest shared
+blocker (Repayments, Reconciliation, Funding, SalaryBuffer).
+
+**Not done, worth a real click-through:** no browser was available in this session for any of the
+three batches — everything above was verified by `tsc --noEmit` + `eslint` only. Sign in through
+each Live tab with a real staff/employer/customer account next time the app is run against Neon.
 
 **Naming:** every screen calls it "PayBridge Account" per the brand rule in the project's
 CLAUDE.md (never "virtual account"/"virtual salary wallet" in user-facing copy) — the user's own

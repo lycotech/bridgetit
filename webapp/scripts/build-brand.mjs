@@ -727,7 +727,7 @@ const ico = async (svg, size = 32) => {
 const manifest = {
   name: "PayBridge",
   short_name: "PayBridge",
-  description: "From payroll to prosperity.",
+  description: "Financial wellbeing, built around work.",
   start_url: "/",
   display: "standalone",
   background_color: NAVY,

@@ -11,6 +11,8 @@ import { TrendChart, BarSeries, DonutSplit, ChartTabs, useChartRange, sliceSerie
 import { opsApi, qk } from "@/lib/platform/mock-service";
 import { downloadCsv, downloadFile, naira, nairaCompact, shortDate } from "@/lib/platform/format";
 import type { Statement } from "@/lib/platform/models";
+import { LiveModeTabs } from "@/components/operations/LiveModeTabs";
+import RealAdminReports from "@/pages/admin/portal/Reports";
 
 const REPORTS = [
   { title: "Platform activity report", detail: "Bridge volume, values and settlement performance" },
@@ -88,6 +90,12 @@ export default function OperationsReportsPage() {
         }
       />
 
+      <LiveModeTabs
+        gateTitle="Staff credentials required"
+        gateDescription="Sign in with your PayBridge staff account to see real portfolio-wide aggregates instead of demo data."
+        live={<RealAdminReports />}
+        demo={
+          <div className="space-y-6">
       <StatGrid columns={4}>
         <StatCard
           label="Bridge value today"
@@ -231,6 +239,9 @@ export default function OperationsReportsPage() {
           personal spending activity are never included.
         </InfoNote>
       </Panel>
+          </div>
+        }
+      />
     </div>
   );
 }
