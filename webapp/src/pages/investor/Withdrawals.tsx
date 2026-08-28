@@ -15,6 +15,8 @@ import { investorApi, qk } from "@/lib/platform/mock-service";
 import { longDate, naira, shortDate } from "@/lib/platform/format";
 import type { Withdrawal } from "@/lib/platform/models";
 import { useAccountId } from "@/lib/platform/use-account";
+import { LiveModeTabs } from "@/components/investor/LiveModeTabs";
+import { InvestmentSection } from "@/pages/account/AccountHome";
 
 export default function InvestorWithdrawalsPage() {
   const investorId = useAccountId("investor");
@@ -101,6 +103,12 @@ export default function InvestorWithdrawalsPage() {
         }
       />
 
+      <LiveModeTabs
+        gateTitle="Account sign-in required"
+        gateDescription="Sign in to your real PayBridge account to see and withdraw your real committed capital instead of demo data."
+        live={<InvestmentSection />}
+        demo={
+          <>
       <AsyncPanel query={overview}>
         {(data) => (
           <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
@@ -264,6 +272,9 @@ export default function InvestorWithdrawalsPage() {
           </InfoNote>
         </div>
       </Modal>
+          </>
+        }
+      />
     </div>
   );
 }

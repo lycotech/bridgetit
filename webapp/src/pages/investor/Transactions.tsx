@@ -13,6 +13,8 @@ import { dateTime, naira, shortDate } from "@/lib/platform/format";
 import { RECONCILIATION_STATUSES, TRANSACTION_STATUSES } from "@/lib/platform/models";
 import type { Transaction } from "@/lib/platform/models";
 import { useAccountId } from "@/lib/platform/use-account";
+import { LiveModeTabs } from "@/components/investor/LiveModeTabs";
+import { InvestmentSection } from "@/pages/account/AccountHome";
 
 export default function InvestorTransactionsPage() {
   const investorId = useAccountId("investor");
@@ -84,6 +86,12 @@ export default function InvestorTransactionsPage() {
         description="Every inflow, distribution and withdrawal on your account."
       />
 
+      <LiveModeTabs
+        gateTitle="Account sign-in required"
+        gateDescription="Sign in to your real PayBridge account to see your real capital commitments instead of demo transactions."
+        live={<InvestmentSection />}
+        demo={
+          <>
       <StatGrid columns={3}>
         <StatCard
           label="Total committed in"
@@ -184,6 +192,9 @@ export default function InvestorTransactionsPage() {
           </div>
         ) : null}
       </Modal>
+          </>
+        }
+      />
     </div>
   );
 }

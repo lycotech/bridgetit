@@ -34,6 +34,7 @@ import { preferencesRouter } from "./routes/preferences";
 import { consentsRouter } from "./routes/consents";
 import { supportRouter } from "./routes/support";
 import { demoRouter } from "./routes/demo";
+import { aiAssistantRouter } from "./routes/ai-assistant";
 import { logMailPosture } from "./email/mailer";
 import { securityHeaders } from "./security/headers";
 import { csrfProtection } from "./security/csrf";
@@ -195,6 +196,7 @@ app.route("/api/consents", consentsRouter);
 // most need to reach a human are the ones who cannot sign in. Reading is
 // strictly the caller's own tickets.
 app.route("/api/support", supportRouter);
+app.route("/api/ai-assistant", aiAssistantRouter);
 // Non-public. Both routers gate themselves; nothing is readable without a
 // staff session, and the demo router answers 404 rather than 403 so the
 // surface is not discoverable by probing.

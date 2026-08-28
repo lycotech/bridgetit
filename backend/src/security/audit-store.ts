@@ -76,6 +76,7 @@ export interface RecordInput {
     /** A person's accessibility settings. The VALUES never go in `detail`. */
     | "preferences"
     | "consent"
+    | "ai_assistant"
     | null;
   targetId?: string | null;
   previousStatus?: string | null;

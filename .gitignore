@@ -8,3 +8,4 @@
 *.key
 
 .DS_Store
+.gstack/

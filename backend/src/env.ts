@@ -96,6 +96,17 @@ const envSchema = z.object({
     .refine((v) => v.startsWith("sk-"), "must look like an OpenAI key")
     .optional(),
 
+  /**
+   * Anthropic (Claude) API key for the real AI Assistant chat feature
+   * (routes/ai-assistant.ts). Optional — without it the endpoint returns a
+   * clear "not configured" error instead of the chat working.
+   */
+  ANTHROPIC_API_KEY: z
+    .string()
+    .min(20)
+    .refine((v) => v.startsWith("sk-ant-"), "must look like an Anthropic key")
+    .optional(),
+
   /* ------------------------------------------------------------------ MAIL */
   /*
    * Outbound mail. Every one of these is optional: with none of them set the
@@ -195,6 +206,7 @@ function validateEnv() {
         ? "configured"
         : "EPHEMERAL — KYC data will not survive a restart",
       openai: parsed.data.OPENAI_API_KEY ? "configured" : "absent",
+      anthropic: parsed.data.ANTHROPIC_API_KEY ? "configured" : "absent",
       // Presence only, never the value — see the note above.
       adminLogin: parsed.data.ADMIN_USERNAME ? "configured" : "absent",
     }),

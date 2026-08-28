@@ -45,14 +45,14 @@ PRD.md names 14 backend services. Here is what actually exists for each, in
 | **Savings** | ✅ Built (2026-08-02) | New `SavingsGoal`/`SavingsTransaction` models. `backend/src/routes/savings.ts` (`/api/savings/*`) — create a goal, deposit, withdraw, all real and persisted. Real UI: a "Savings" panel on the customer's `/account` page. **Honesty limitation, stated in the UI and code, not hidden**: no bank rail exists (§ Disbursement/Repayment, deferred), so a deposit/withdrawal is a self-reported bookkeeping entry — real numbers the customer entered, not money PayBridge moved. The old mock `employee/Savings.tsx` page is untouched. |
 | **Investments** | ✅ Built (2026-08-02) | New `InvestmentCommitment` model. `backend/src/routes/investments.ts` (`/api/investments/*`) — an investor-only (`accountType === "investor"`) commitment ledger, same honesty limitation as Savings, PLUS a real `GET /portfolio` snapshot computed live from `Employer`/`CreditLimit`/`BridgeDraw`/`PayrollCycle` — actual employer count, exposure, Bridge volume, an investor's own vs. total committed capital. Deliberately reports **no yield/return figure** — there is no interest-distribution model anywhere in this codebase, and inventing one would be fabricating a financial promise. Real UI: an "Investments" panel on `/account` for investor accounts. The old mock `employee/Invest.tsx` and the entire `investor/*` demo portal are untouched. |
 | **Reporting** | ✅ Partial (2026-08-02) | `backend/src/routes/admin-reports.ts` (`GET /api/admin/reports/overview`, new `reports.view` permission) — real portfolio-wide aggregates: employers by status/tier, KYC funnel, credit exposure, payroll totals, Bridge draw counts/volume, savings/investment totals. Every query is a `count`/`groupBy`/`aggregate` — no individual customer's name or balance appears, by construction. Real UI at `/admin/reports`. **Partial**: only the ops/admin-side aggregate view was built — the employer-facing `Reports.tsx`, investor-facing `Performance.tsx`/`Statements.tsx`, and every other per-portal reporting page are still mock-service backed; wiring those is dashboard-rewiring work, same category as the note below. |
-| **AI Assistant** | ❌ Not built (added to PRD.md 2026-08-21, planning only) | No backend route, no real LLM call anywhere in the codebase. Scoped in PRD.md as a cross-cutting chat-based support/guidance service, not tied to one portal. **Not the same thing** as `components/employee/AIAssistWidget.tsx` (§10) — that widget is explicitly rules-based/computed from the employee's own numbers, with no live AI call, and lives only in the mock employee demo. When this is actually built, use the `ai-apis-like-chatgpt` skill and decide then which portal(s) it should appear in, what it's allowed to see (same privacy boundary as `HrPrivacy.tsx`/employer visibility rules), and whether it replaces or sits alongside the existing rules-based widget. |
+| **AI Assistant** | ✅ Built (2026-08-28) | `backend/src/routes/ai-assistant.ts` (`POST /api/ai-assistant/chat`) — a real Claude call (`@anthropic-ai/sdk`, model `claude-opus-5`), gated behind `requireFinancialAccess()` so only a verified customer on the real `/account` page can reach it. Grounded ONLY in that signed-in customer's own real data, assembled server-side each request (Bridge eligibility/earned-wage estimate, Bridge draw history, Savings goal count/total, PayBridge Score, PayBridge Account status, investor committed capital) — never another customer's, never the employer/admin side. System prompt hard-codes the same forbidden-claims list as the public site (no guaranteed returns, no claiming Savings/Investments move real money, no claiming disbursement/repayment exists). Requires `ANTHROPIC_API_KEY` (optional at boot, same pattern as `OPENAI_API_KEY`; unset returns a clear 503 `AI_NOT_CONFIGURED` instead of failing) — **not yet set in production**, so the feature is code-complete but inactive until a key is added to Render. Real UI: a second floating launcher ("Ask PayBridge AI", bottom-left) on `/account`, `components/account/AIAssistantChat.tsx` — kept deliberately separate from `components/account/AIAssistWidget.tsx` (bottom-right), which stays exactly as it was: rules-based, no live AI call. Both widgets are kept, by explicit user decision. Not cURL-verified against a live Anthropic key or Postgres instance in this session (neither reachable here) — verified by typecheck only (backend + webapp both clean). **Not yet built**: the mock `employee/AIAssistWidget.tsx` (§10, mock demo) and the investor/employer/ops portals have no equivalent; scope was deliberately limited to the real `/account` page for this pass. |
 
-**Bottom line (2026-08-21, updated for the AI Assistant addition):** of 15 named services, 11 are
+**Bottom line (2026-08-28, updated for the real AI Assistant):** of 15 named services, 12 are
 genuinely built and wired (Authentication, Admin, Employer Management, Payroll Engine, Eligibility
-Engine, Risk & Compliance, Bridge Engine, Treasury, Savings, Investments, Reporting-partial), 2 are
-partially done (Notifications, Employee Management), and 2 do not exist as a backend service at
-all: Repayments (folded into the deferred Disbursement/Repayment item) and AI Assistant (added to
-PRD.md 2026-08-21, planning only — not scheduled). Every dashboard for the still-mock `/employer/*`
+Engine, Risk & Compliance, Bridge Engine, Treasury, Savings, Investments, Reporting-partial, AI
+Assistant), 2 are partially done (Notifications, Employee Management), and 1 does not exist as a
+backend service at all: Repayments (folded into the deferred Disbursement/Repayment item, on hold
+pending the Monnify verification approval). Every dashboard for the still-mock `/employer/*`
 and `/employee/*` demo pages (which have NOT been
 rewired to any of the real services above) reads and writes through
 `webapp/src/lib/platform/mock-service.ts`, whose own header comment says: *"Swapping this file
@@ -99,7 +99,7 @@ link), `POST /:userId/decision` (approve/reject, gated on `kyc.decide`). Real UI
 | Employee dashboard | ❌ mock UI only (`/employee/*`); real employee functionality (eligibility, Bridge, savings, investments) lives on the real `/account` page — see §2 |
 | Operations dashboard | ⚠️ Partial (2026-08-28) — Support, Risk, Employers, Settings' audit log, and Reports each gained a real "Live data" tab (see §11); demo data stays the default so the prospect walkthrough is unchanged. Employees, Investors, Transactions, Funding, Portfolios, PayrollOps, Reconciliation, Compliance remain mock-only — no real backend concept to attach to yet. |
 | Admin console | ✅ real, working today |
-| Basic investor dashboard | ⚠️ Partial (2026-08-28) — real commitment ledger + real portfolio snapshot on `/account` for investor accounts (see §2, Investments); `investor/Overview.tsx` and `investor/Invest.tsx` in the polished mock portal each gained a real "Live data" tab reusing that same panel (see §11); the rest of the mock `investor/*` portal (Performance, Transactions, Statements, Withdrawals, Documents, Profile) is untouched — no real yield/statement/KYB backend exists |
+| Basic investor dashboard | ⚠️ Partial (2026-08-28) — real commitment ledger + real portfolio snapshot on `/account` for investor accounts (see §2, Investments); `investor/Overview.tsx`, `investor/Invest.tsx`, `investor/Withdrawals.tsx` and `investor/Transactions.tsx` in the polished mock portal each gained a real "Live data" tab reusing that same panel (see §11); the rest of the mock `investor/*` portal (Performance, Statements, Documents, Profile) is untouched — no real yield/statement/KYB backend exists |
 
 ## 5. Known live-environment issues
 
@@ -151,9 +151,9 @@ tick items off here as they land rather than treating this as a static plan.
 8. ⏸️ **Disbursement/Repayment** — deliberately deferred (2026-08-02, by user decision). The
    next real gap once resumed: `BridgeDraw.status` stops at `approved`; nothing moves money or
    reconciles a payroll deduction against it. Largest, highest-risk item left — do it only for a
-   real pilot employer, not the public demo. Requires a real payment/banking integration
-   decision first (which provider, whose compliance obligations) — a product conversation, not
-   something to pick while wiring a route.
+   real pilot employer, not the public demo. Provider decided (2026-08-28): **Monnify** — but
+   its verification/KYB has **not yet been approved**, so this stays blocked until that clears.
+   Do not start wiring Monnify integration code before verification is confirmed approved.
 9. ✅ **Savings / Investments / Reporting** — done (2026-08-02), see §2. Built as ledger-only /
    aggregate-only by explicit user decision, given step 8's deferral means neither Savings nor
    Investments can move real money yet.
@@ -161,11 +161,9 @@ tick items off here as they land rather than treating this as a static plan.
 11. Test coverage for every area above as it goes real — `risk.test.ts` is currently the *only*
     test file in the repo; no tests exist for any route, `session.ts`, `passwords.ts`, CSRF, or
     anywhere in `webapp/`.
-12. ⏸️ **AI Assistant** — added to PRD.md as a named service (2026-08-21), by explicit user
-    request, **not to be built yet** — this item exists so the service is tracked, not as a
-    signal to start it. When picked up: use the `ai-apis-like-chatgpt` skill, decide which
-    portal(s) it appears in and what data it's allowed to see, and decide its relationship to the
-    existing rules-based `AIAssistWidget.tsx` (§10) — replace it, or keep both.
+12. ✅ **AI Assistant** — built (2026-08-28), see §2. Real Claude chat on `/account`, kept
+    alongside (not replacing) the existing rules-based `AIAssistWidget.tsx`, by explicit user
+    decision. Needs `ANTHROPIC_API_KEY` set in production before it actually responds.
 
 ## 7. Infra/deploy status
 
@@ -628,11 +626,12 @@ empty or erroring panel.
 |---|---|---|
 | `investor/Overview.tsx` | `InvestmentSection` (real portfolio snapshot + commitment list) | `/account`'s Investments panel |
 | `investor/Invest.tsx` | `InvestmentSection` (same panel — the real commit flow is one amount field, not the mock's mandate/portfolio picker) | `/account`'s Investments panel |
+| `investor/Withdrawals.tsx` | `InvestmentSection` (2026-08-28 — the real "Withdraw" action per commitment IS the real withdrawal flow; there is no separate real withdrawal request/review step to mirror) | `/account`'s Investments panel |
+| `investor/Transactions.tsx` | `InvestmentSection` (2026-08-28 — the real commitment list IS the real transaction history; no separate real ledger exists) | `/account`'s Investments panel |
 
 Both typecheck and lint clean. Left mock, deliberately, same as the employer/ops batches — no real
 backend exists for any of it: `Performance.tsx` (no yield/return model — explicit non-goal per §2
-Investments), `Statements.tsx` (no statement generator), `Withdrawals.tsx`/`Transactions.tsx` (would
-just re-show the same commitment list `InvestmentSection` already covers, no added value), `Documents.tsx`
+Investments), `Statements.tsx` (no statement generator), `Documents.tsx`
 (no investor KYB flow), `Profile.tsx` (no investor-specific profile endpoint).
 
 **With this batch, all three items C named — employer, investor, operations — have at least one

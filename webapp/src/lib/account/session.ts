@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type {
   AcceptEmployeeLinkInput,
+  AiAssistantChatInput,
+  AiAssistantChatResponseView,
   BridgeDrawView,
   ChangeEmailInput,
   ConfirmTwoFactorInput,
@@ -408,6 +410,14 @@ export function useRequestSavingsBridge() {
       void qc.invalidateQueries({ queryKey: ["account", "savings-bridge", "draws"] });
       void qc.invalidateQueries({ queryKey: ["account", "savings", "goals"] });
     },
+  });
+}
+
+/* ------------------------------------------------------------- AI ASSISTANT */
+
+export function useAiAssistantChat() {
+  return useMutation({
+    mutationFn: (input: AiAssistantChatInput) => api.post<AiAssistantChatResponseView>("/api/ai-assistant/chat", input),
   });
 }
 

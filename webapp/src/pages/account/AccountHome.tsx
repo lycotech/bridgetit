@@ -24,6 +24,7 @@ import { ActionButton } from "@/components/dashboard/PageHeader";
 import { CheckboxField } from "@/components/dashboard/forms";
 import { TwoFactorPanel } from "@/components/account/TwoFactorPanel";
 import { AIAssistWidget } from "@/components/account/AIAssistWidget";
+import { AIAssistantChat } from "@/components/account/AIAssistantChat";
 import {
   useBridgeDraws,
   useCreateInvestmentCommitment,
@@ -813,6 +814,7 @@ export default function AccountHome() {
       {user?.accountType === "investor" ? <InvestmentSection /> : null}
       <TwoFactorSection enabled={user?.twoFactorEnabled ?? false} />
       <AIAssistWidget />
+      <AIAssistantChat />
 
       <div className="grid gap-3 sm:grid-cols-2">
         {LOCKED_FEATURES.map((feature) => (

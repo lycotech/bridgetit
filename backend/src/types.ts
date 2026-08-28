@@ -2029,6 +2029,8 @@ export const AUDIT_ACTIONS = [
   "investment.commitment.recorded",
   "investment.commitment.withdrawn",
   "reports.viewed",
+  "ai_assistant.chat.replied",
+  "ai_assistant.chat.error",
 
   // KYC
   "kyc.submitted",
@@ -2160,6 +2162,8 @@ export const AUDIT_ACTION_LABELS: Partial<Record<AuditAction, string>> = {
   "consent.accepted": "Consent accepted",
   "consent.withdrawn": "Consent withdrawn",
   "audit.exported": "Audit trail exported",
+  "ai_assistant.chat.replied": "AI Assistant replied",
+  "ai_assistant.chat.error": "AI Assistant request failed",
 };
 
 export function auditActionLabel(action: string): string {
@@ -2504,3 +2508,31 @@ export const acceptConsentSchema = z.object({
   readLocale: z.enum(LOCALE_CODES).default("en"),
 });
 export type AcceptConsentInput = z.infer<typeof acceptConsentSchema>;
+
+// ---------------------------------------------------------- ai assistant ---
+
+/**
+ * The real AI Assistant chat (backend/src/routes/ai-assistant.ts,
+ * webapp/src/components/account/AIAssistantChat.tsx) on the customer
+ * `/account` page. A live Claude call, grounded only in the signed-in
+ * customer's own real numbers — distinct from AIAssistWidget.tsx, which
+ * stays a separate, explicitly rules-based savings suggestion with no live
+ * AI call. See AGENTS.md §6 item 12.
+ */
+export const aiAssistantMessageSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string().trim().min(1).max(4000),
+});
+export type AiAssistantMessage = z.infer<typeof aiAssistantMessageSchema>;
+
+export const aiAssistantChatInputSchema = z.object({
+  message: z.string().trim().min(1).max(2000),
+  /** Prior turns of this conversation, oldest first — the client replays it, the API is stateless. */
+  history: z.array(aiAssistantMessageSchema).max(20).default([]),
+});
+export type AiAssistantChatInput = z.infer<typeof aiAssistantChatInputSchema>;
+
+export const aiAssistantChatResponseSchema = z.object({
+  reply: z.string(),
+});
+export type AiAssistantChatResponseView = z.infer<typeof aiAssistantChatResponseSchema>;
