@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { AccountLayout } from "@/components/account/AccountLayout";
 import { ActionButton } from "@/components/dashboard/PageHeader";
+import { ProgressMeter } from "@/components/dashboard/Panel";
 import { CheckboxField } from "@/components/dashboard/forms";
 import { TwoFactorPanel } from "@/components/account/TwoFactorPanel";
 import {
@@ -523,6 +524,15 @@ export function SavingsSection() {
                   ₦{g.balance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
                 </p>
               </div>
+              {g.targetAmount ? (
+                <ProgressMeter
+                  className="mt-2"
+                  value={(g.balance / g.targetAmount) * 100}
+                  label={`Goal: ₦${g.targetAmount.toLocaleString("en-NG")}`}
+                  right={`${Math.min(100, Math.round((g.balance / g.targetAmount) * 100))}%`}
+                  tone="primary"
+                />
+              ) : null}
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <input
                   type="number"

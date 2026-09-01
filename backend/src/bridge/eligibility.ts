@@ -60,7 +60,17 @@ export async function computeEligibility(userId: string, kycStatus: string): Pro
   let earnedWageEstimate: number | null = null;
   let currentPeriodStart: string | null = null;
   let expectedPayDate: string | null = null;
+  let grossPay: number | null = null;
+  let netPay: number | null = null;
+  let deductions: number | null = null;
+  let allowances: number | null = null;
+  let bonus: number | null = null;
   if (latest) {
+    grossPay = Number(latest.grossPay);
+    netPay = latest.netPay === null ? null : Number(latest.netPay);
+    deductions = latest.deductions === null ? null : Number(latest.deductions);
+    allowances = latest.allowances === null ? null : Number(latest.allowances);
+    bonus = latest.bonus === null ? null : Number(latest.bonus);
     const base = latest.netPay !== null ? Number(latest.netPay) : Number(latest.grossPay);
     const start = latest.cycle.periodStart.getTime();
     const end = latest.cycle.expectedPayDate.getTime();
@@ -99,6 +109,11 @@ export async function computeEligibility(userId: string, kycStatus: string): Pro
       earnedWageEstimate,
       currentPeriodStart,
       expectedPayDate,
+      grossPay,
+      netPay,
+      deductions,
+      allowances,
+      bonus,
       reasons,
     },
     employeeRecordId: employeeRecord?.id ?? null,

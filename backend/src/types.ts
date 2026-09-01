@@ -1075,6 +1075,12 @@ export const eligibilitySchema = z.object({
   currentPeriodStart: z.string().nullable(),
   /** The employer's real payroll cycle pay date — for showing a real "payday" marker, not an invented one. */
   expectedPayDate: z.string().nullable(),
+  /** From the most recent real PayrollRecord. Null until payroll is verified — never a fabricated breakdown. */
+  grossPay: z.number().nullable(),
+  netPay: z.number().nullable(),
+  deductions: z.number().nullable(),
+  allowances: z.number().nullable(),
+  bonus: z.number().nullable(),
   /** Human-readable blockers, empty when `eligible` is true. */
   reasons: z.array(z.string()),
 });
