@@ -1,16 +1,14 @@
 import { useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import {
   AlertCircle,
   ArrowRight,
-  BadgeCheck,
   Ban,
   Building2,
   Check,
   Clock3,
   FileWarning,
   Gauge,
-  Gift,
   LifeBuoy,
   Lock,
   PiggyBank,
@@ -23,8 +21,6 @@ import { AccountLayout } from "@/components/account/AccountLayout";
 import { ActionButton } from "@/components/dashboard/PageHeader";
 import { CheckboxField } from "@/components/dashboard/forms";
 import { TwoFactorPanel } from "@/components/account/TwoFactorPanel";
-import { AIAssistWidget } from "@/components/account/AIAssistWidget";
-import { AIAssistantChat } from "@/components/account/AIAssistantChat";
 import {
   useBridgeDraws,
   useCreateInvestmentCommitment,
@@ -156,7 +152,7 @@ function CheckRow({ ok, label }: { ok: boolean; label: string }) {
  * employee-link.ts). See `BridgeRequestSection` below for the actual draw
  * request, which reads this same eligibility server-side before deciding.
  */
-function EligibilitySection() {
+export function EligibilitySection() {
   const { data } = useEligibility(true);
   if (!data) return null;
 
@@ -198,7 +194,7 @@ function EligibilitySection() {
  * (set via the credit-risk decision at /admin/risk). Nothing here moves
  * money — see AGENTS.md, "Disbursement/Repayment" for what's still missing.
  */
-function BridgeRequestSection() {
+export function BridgeRequestSection() {
   const { data: eligibility } = useEligibility(true);
   const draws = useBridgeDraws(true);
   const request = useRequestBridgeDraw();
@@ -287,7 +283,7 @@ function BridgeRequestSection() {
  * backend is the actual source of truth and rejects an unlinked employee's
  * request regardless of what this section renders).
  */
-function SalaryAccountSection() {
+export function SalaryAccountSection() {
   const { data: eligibility } = useEligibility(true);
   const requests = useMySalaryAccountRequests(true);
   const request = useRequestSalaryAccount();
@@ -393,7 +389,7 @@ function SalaryAccountSection() {
  * (backend/src/routes/paybridge-account.ts), so this is honestly "coming
  * soon" rather than a fabricated account number.
  */
-function PayBridgeAccountSection() {
+export function PayBridgeAccountSection() {
   const account = usePayBridgeAccount(true);
   if (!account.data || account.data.status !== "pending") return null;
 
@@ -413,7 +409,7 @@ function PayBridgeAccountSection() {
  * from real signals only, capped short of the top band since real repayment
  * history doesn't exist anywhere in this system yet.
  */
-function CreditScoreSection() {
+export function CreditScoreSection() {
   const score = useCreditScore(true);
   if (!score.data) return null;
 
@@ -448,7 +444,7 @@ function savingsBridgeEligible(balance: number, createdAt: string): number {
   return Math.floor(balance * 0.5);
 }
 
-function SavingsSection() {
+export function SavingsSection() {
   const goals = useSavingsGoals(true);
   const createGoal = useCreateSavingsGoal();
   const deposit = useSavingsDeposit();
@@ -695,7 +691,7 @@ function Stat({ label, value }: { label: string; value: string }) {
  * (employee/Profile.tsx, employer/Settings.tsx, investor/Profile.tsx) is
  * about a different, unwired system — this is the one that actually works.
  */
-function TwoFactorSection({ enabled }: { enabled: boolean }) {
+export function TwoFactorSection({ enabled }: { enabled: boolean }) {
   const enrol = useEnrolTwoFactor();
   const enable = useEnableTwoFactor();
   const disable = useDisableTwoFactor();
@@ -783,62 +779,8 @@ export default function AccountHome() {
     );
   }
 
-  // gate === "active"
-  return (
-    <AccountLayout
-      eyebrow="Verified account"
-      title={`Welcome, ${firstName}`}
-      description="Your identity is confirmed and your PayBridge account is open."
-      actions={
-        <Link
-          to="/account/refer"
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-4 py-2 text-sm font-semibold text-foreground hover:border-primary/50 hover:text-primary"
-        >
-          <Gift className="h-4 w-4" /> Refer &amp; earn
-        </Link>
-      }
-    >
-      <Panel tone="success" icon={<BadgeCheck className="h-5 w-5 text-primary" />} title="Identity verified">
-        <p>
-          Approved {formatDate(kyc?.reviewedAt ?? user?.kycReviewedAt ?? null)}. Every PayBridge feature available to
-          your account type is now unlocked.
-        </p>
-      </Panel>
-
-      <EligibilitySection />
-      <BridgeRequestSection />
-      <SalaryAccountSection />
-      <PayBridgeAccountSection />
-      <CreditScoreSection />
-      <SavingsSection />
-      {user?.accountType === "investor" ? <InvestmentSection /> : null}
-      <TwoFactorSection enabled={user?.twoFactorEnabled ?? false} />
-      <AIAssistWidget />
-      <AIAssistantChat />
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        {LOCKED_FEATURES.map((feature) => (
-          <div
-            key={feature.label}
-            className="flex items-start gap-3 rounded-2xl border border-border bg-background px-4 py-4"
-          >
-            <feature.icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            <span className="min-w-0">
-              <span className="block text-sm font-semibold text-foreground">{feature.label.split(" — ")[0]}</span>
-              <span className="block text-xs text-muted-foreground">Ready to use</span>
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <p className="text-sm leading-relaxed text-muted-foreground">
-        Your live dashboard is being connected to these features. In the meantime, our team can walk you through
-        anything you need —{" "}
-        <Link to="/contact" className="font-semibold text-primary hover:underline">
-          get in touch
-        </Link>
-        .
-      </p>
-    </AccountLayout>
-  );
+  // gate === "active" — the real dashboard lives at /account/employee or
+  // /account/investor now (RealDashboardShell); this page's job for an
+  // active account is just to route them there by accountType.
+  return <Navigate to={user?.accountType === "investor" ? "/account/investor" : "/account/employee"} replace />;
 }

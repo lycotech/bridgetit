@@ -49,6 +49,10 @@ import VerifyIdentity from "./pages/account/VerifyIdentity";
 import AccountHome from "./pages/account/AccountHome";
 import Refer from "./pages/account/Refer";
 import LinkEmployer from "./pages/account/LinkEmployer";
+import { RealDashboardShell } from "@/components/account/RealDashboardShell";
+import { ComingSoon } from "./pages/account/ComingSoon";
+import EmployeeOverview from "./pages/account/employee/Overview";
+import InvestorOverview from "./pages/account/investor/Overview";
 import { RequireGate, RedirectIfSignedIn as RedirectIfCustomerSignedIn } from "@/components/account/AccountGate";
 import EmployerPortalRegister from "./pages/employer-portal/Register";
 import EmployerPortalLogin from "./pages/employer-portal/Login";
@@ -204,6 +208,48 @@ const App = () => (
                 </RequireGate>
               }
             />
+
+            {/* ----------------------------------------------------------------
+                REAL CUSTOMER DASHBOARD — a structural/visual replica of the
+                mock demo's /employee and /investor shells, wired to real data.
+                See webapp/src/components/account/RealDashboardShell.tsx. */}
+            <Route
+              path="/account/employee"
+              element={
+                <RequireGate allow={["active"]}>
+                  <RealDashboardShell portal="employee" />
+                </RequireGate>
+              }
+            >
+              <Route index element={<EmployeeOverview />} />
+              <Route path="bridge" element={<ComingSoon title="Bridge" description="Request and track your Bridge draws." />} />
+              <Route path="pay" element={<ComingSoon title="My Pay" description="Your full pay breakdown for the period." />} />
+              <Route path="savings" element={<ComingSoon title="Save" description="Structured savings goals." />} />
+              <Route path="invest" element={<ComingSoon title="Invest" description="Investing is not yet available for employee accounts." />} />
+              <Route path="grow" element={<ComingSoon title="Grow" description="Your PayBridge Score and financial wellbeing." />} />
+              <Route path="refer" element={<ComingSoon title="Refer & Earn" description="Invite a colleague to PayBridge." />} />
+              <Route path="transactions" element={<ComingSoon title="Transactions" description="Your Bridge and savings activity." />} />
+              <Route path="profile" element={<ComingSoon title="Profile & bank" description="Your details, bank accounts and security." />} />
+              <Route path="support" element={<ComingSoon title="Support" description="Get help from the PayBridge team." />} />
+            </Route>
+            <Route
+              path="/account/investor"
+              element={
+                <RequireGate allow={["active"]}>
+                  <RealDashboardShell portal="investor" />
+                </RequireGate>
+              }
+            >
+              <Route index element={<InvestorOverview />} />
+              <Route path="invest" element={<ComingSoon title="Invest" description="Browse mandates and commit capital." />} />
+              <Route path="performance" element={<ComingSoon title="Performance" description="Track portfolio performance over time." />} />
+              <Route path="transactions" element={<ComingSoon title="Transactions" description="Every inflow, distribution and withdrawal." />} />
+              <Route path="withdrawals" element={<ComingSoon title="Withdrawals" description="Withdraw available funds." />} />
+              <Route path="statements" element={<ComingSoon title="Statements" description="Portfolio statements and tax documents." />} />
+              <Route path="documents" element={<ComingSoon title="Documents & KYB" description="Verification documents." />} />
+              <Route path="profile" element={<ComingSoon title="Profile" description="Your details and security." />} />
+            </Route>
+
             {/* Reached from the "you've been added to payroll" email. Handles
                 its own auth state (anonymous vs signed in) rather than being
                 wrapped in RequireGate, since it must work for someone who is
