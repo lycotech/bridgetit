@@ -47,12 +47,26 @@ import CustomerSignIn from "./pages/account/SignIn";
 import VerifyEmail from "./pages/account/VerifyEmail";
 import VerifyIdentity from "./pages/account/VerifyIdentity";
 import AccountHome from "./pages/account/AccountHome";
-import Refer from "./pages/account/Refer";
 import LinkEmployer from "./pages/account/LinkEmployer";
 import { RealDashboardShell } from "@/components/account/RealDashboardShell";
-import { ComingSoon } from "./pages/account/ComingSoon";
 import EmployeeOverview from "./pages/account/employee/Overview";
+import EmployeeBridge from "./pages/account/employee/Bridge";
+import EmployeePay from "./pages/account/employee/Pay";
+import EmployeeSavings from "./pages/account/employee/Savings";
+import EmployeeInvest from "./pages/account/employee/Invest";
+import EmployeeRefer from "./pages/account/employee/Refer";
+import EmployeeTransactions from "./pages/account/employee/Transactions";
+import EmployeeGrow from "./pages/account/employee/Grow";
+import EmployeeProfile from "./pages/account/employee/Profile";
+import EmployeeSupport from "./pages/account/employee/Support";
 import InvestorOverview from "./pages/account/investor/Overview";
+import InvestorInvest from "./pages/account/investor/Invest";
+import InvestorWithdrawals from "./pages/account/investor/Withdrawals";
+import InvestorTransactions from "./pages/account/investor/Transactions";
+import InvestorProfile from "./pages/account/investor/Profile";
+import InvestorPerformance from "./pages/account/investor/Performance";
+import InvestorStatements from "./pages/account/investor/Statements";
+import InvestorDocuments from "./pages/account/investor/Documents";
 import { RequireGate, RedirectIfSignedIn as RedirectIfCustomerSignedIn } from "@/components/account/AccountGate";
 import EmployerPortalRegister from "./pages/employer-portal/Register";
 import EmployerPortalLogin from "./pages/employer-portal/Login";
@@ -200,14 +214,9 @@ const App = () => (
                 </RequireGate>
               }
             />
-            <Route
-              path="/account/refer"
-              element={
-                <RequireGate allow={["active"]}>
-                  <Refer />
-                </RequireGate>
-              }
-            />
+            {/* Absorbed into the new dashboard — keep the old path working for
+                anything bookmarked/emailed rather than a hard break. */}
+            <Route path="/account/refer" element={<Navigate to="/account/employee/refer" replace />} />
 
             {/* ----------------------------------------------------------------
                 REAL CUSTOMER DASHBOARD — a structural/visual replica of the
@@ -222,15 +231,15 @@ const App = () => (
               }
             >
               <Route index element={<EmployeeOverview />} />
-              <Route path="bridge" element={<ComingSoon title="Bridge" description="Request and track your Bridge draws." />} />
-              <Route path="pay" element={<ComingSoon title="My Pay" description="Your full pay breakdown for the period." />} />
-              <Route path="savings" element={<ComingSoon title="Save" description="Structured savings goals." />} />
-              <Route path="invest" element={<ComingSoon title="Invest" description="Investing is not yet available for employee accounts." />} />
-              <Route path="grow" element={<ComingSoon title="Grow" description="Your PayBridge Score and financial wellbeing." />} />
-              <Route path="refer" element={<ComingSoon title="Refer & Earn" description="Invite a colleague to PayBridge." />} />
-              <Route path="transactions" element={<ComingSoon title="Transactions" description="Your Bridge and savings activity." />} />
-              <Route path="profile" element={<ComingSoon title="Profile & bank" description="Your details, bank accounts and security." />} />
-              <Route path="support" element={<ComingSoon title="Support" description="Get help from the PayBridge team." />} />
+              <Route path="bridge" element={<EmployeeBridge />} />
+              <Route path="pay" element={<EmployeePay />} />
+              <Route path="savings" element={<EmployeeSavings />} />
+              <Route path="invest" element={<EmployeeInvest />} />
+              <Route path="grow" element={<EmployeeGrow />} />
+              <Route path="refer" element={<EmployeeRefer />} />
+              <Route path="transactions" element={<EmployeeTransactions />} />
+              <Route path="profile" element={<EmployeeProfile />} />
+              <Route path="support" element={<EmployeeSupport />} />
             </Route>
             <Route
               path="/account/investor"
@@ -241,13 +250,13 @@ const App = () => (
               }
             >
               <Route index element={<InvestorOverview />} />
-              <Route path="invest" element={<ComingSoon title="Invest" description="Browse mandates and commit capital." />} />
-              <Route path="performance" element={<ComingSoon title="Performance" description="Track portfolio performance over time." />} />
-              <Route path="transactions" element={<ComingSoon title="Transactions" description="Every inflow, distribution and withdrawal." />} />
-              <Route path="withdrawals" element={<ComingSoon title="Withdrawals" description="Withdraw available funds." />} />
-              <Route path="statements" element={<ComingSoon title="Statements" description="Portfolio statements and tax documents." />} />
-              <Route path="documents" element={<ComingSoon title="Documents & KYB" description="Verification documents." />} />
-              <Route path="profile" element={<ComingSoon title="Profile" description="Your details and security." />} />
+              <Route path="invest" element={<InvestorInvest />} />
+              <Route path="performance" element={<InvestorPerformance />} />
+              <Route path="transactions" element={<InvestorTransactions />} />
+              <Route path="withdrawals" element={<InvestorWithdrawals />} />
+              <Route path="statements" element={<InvestorStatements />} />
+              <Route path="documents" element={<InvestorDocuments />} />
+              <Route path="profile" element={<InvestorProfile />} />
             </Route>
 
             {/* Reached from the "you've been added to payroll" email. Handles

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Copy, Gift, Users } from "lucide-react";
-import { AccountLayout } from "@/components/account/AccountLayout";
-import { ActionButton } from "@/components/dashboard/PageHeader";
+import { PageHeader, ActionButton } from "@/components/dashboard/PageHeader";
 import { Panel } from "@/components/dashboard/Panel";
 import { StatCard, StatGrid } from "@/components/dashboard/StatCard";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
@@ -14,11 +13,13 @@ function shortDate(iso: string): string {
 }
 
 /**
- * Real counterpart of the demo-only mock referral system (AGENTS.md §10).
- * The reward is a real Savings deposit once a referral joins — see
- * backend/src/routes/auth.ts's register handler — not an unexplained number.
+ * Real employee Refer & Earn — `/account/employee/refer`. Moved here from
+ * the old flat `/account/refer` (which now redirects), with the same
+ * content minus its own AccountLayout wrapper — RealDashboardShell provides
+ * the chrome now. See backend/src/routes/auth.ts's register handler for the
+ * real reward (a Savings deposit), not an unexplained number.
  */
-export default function Refer() {
+export default function EmployeeRefer() {
   const referrals = useMyReferrals(true);
   const sendReferral = useSendReferral();
 
@@ -50,16 +51,17 @@ export default function Refer() {
   };
 
   return (
-    <AccountLayout
-      eyebrow="Refer & Earn"
-      title="Bring your colleagues to PayBridge"
-      description="Share your code. When someone you refer joins and completes verification, a reward is recorded to your PayBridge savings."
-      actions={
-        <ActionButton icon={<Gift className="h-4 w-4" />} onClick={() => setInviting(true)}>
-          Refer someone
-        </ActionButton>
-      }
-    >
+    <div className="space-y-6">
+      <PageHeader
+        title="Refer & Earn"
+        description="Share your code. When someone you refer joins and completes verification, a reward is recorded to your PayBridge savings."
+        actions={
+          <ActionButton icon={<Gift className="h-4 w-4" />} onClick={() => setInviting(true)}>
+            Refer someone
+          </ActionButton>
+        }
+      />
+
       <StatGrid columns={3}>
         <StatCard label="People invited" value={referrals.data?.invited ?? 0} icon={<Users className="h-4 w-4" />} />
         <StatCard
@@ -156,6 +158,6 @@ export default function Refer() {
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
         </div>
       </Modal>
-    </AccountLayout>
+    </div>
   );
 }
