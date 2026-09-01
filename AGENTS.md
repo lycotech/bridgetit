@@ -118,6 +118,17 @@ Resolved since the 2026-07-30 audit:
   `webapp/src/components/dashboard/DashboardShell.tsx` to call `POST /api/demo/logout`.
 - ✅ Demo role switcher now scoped to the invitation's assigned portal (was: any demo viewer
   could switch to any of the four portals regardless of what their invitation was issued for).
+- ✅ **CSRF false-positive on stale cookies (2026-09-01)** — `security/csrf.ts`'s `hasSessionCookie`
+  check was a raw `cookieHeader.includes("pb_session=")`-style string match, not a real
+  decode-and-verify. A browser carrying an idle-expired or otherwise invalid session cookie from
+  an earlier visit (customer, admin, demo or employer) still tripped this check, which then
+  required a matching CSRF token that was never issued for that dead session — permanently
+  403'ing every anonymous POST from that browser (registration, waitlist, **demo invitation
+  redemption**) with the generic `"Request rejected."` message until the stale cookie's 12h
+  max-age finally elapsed. Fixed by replacing the string check with real
+  `readSession`/`readStaffSession`/`readEmployerSession` calls (all already decode-and-verify),
+  so only an *actually valid* session now triggers the token requirement. Caught via the
+  `/private-demo` invitation form surfacing `csrf.token.rejected` in the audit log.
 
 Still open:
 - ⏳ **Mail transport** — being configured now (Resend). Until verified working end-to-end

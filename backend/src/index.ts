@@ -43,9 +43,6 @@ import { csrfProtection } from "./security/csrf";
 import { rateLimit } from "./security/rate-limit";
 import { isAllowedOrigin, isProduction } from "./security/config";
 import { accessLog, audit } from "./security/audit";
-import { SESSION_COOKIE_NAME } from "./security/session";
-import { ADMIN_COOKIE, DEMO_COOKIE } from "./security/staff-session";
-import { EMPLOYER_SESSION_COOKIE } from "./security/employer-session";
 
 const app = new Hono();
 
@@ -137,10 +134,7 @@ app.use("*", rateLimit({ name: "global", limit: 300, windowMs: 60_000 }));
 //    All three session families are named here: the customer session, the admin
 //    dashboard session and the private-demo session. Leaving the admin cookie
 //    out would exempt the highest-privilege surface from the token check.
-app.use(
-  "*",
-  csrfProtection({ cookieNames: [SESSION_COOKIE_NAME, ADMIN_COOKIE, DEMO_COOKIE, EMPLOYER_SESSION_COOKIE] }),
-);
+app.use("*", csrfProtection());
 
 // Health check. Deliberately returns nothing about versions, build, git sha,
 // database status or uptime — a health endpoint is the first thing scanned, and

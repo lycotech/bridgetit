@@ -1,6 +1,8 @@
 import type { MiddlewareHandler } from "hono";
 import { isAllowedOrigin } from "./config";
-import { verifyCsrfToken } from "./session";
+import { readSession, verifyCsrfToken } from "./session";
+import { readStaffSession } from "./staff-session";
+import { readEmployerSession } from "./employer-session";
 import { audit } from "./audit";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -38,9 +40,7 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
  * quirk away from failing, and it silently breaks the moment someone adds a
  * multipart file-upload route. Origin pinning does not have that failure mode.
  */
-export function csrfProtection(options?: { cookieNames?: string[] }): MiddlewareHandler {
-  const cookieNames = options?.cookieNames ?? ["pb_session"];
-
+export function csrfProtection(): MiddlewareHandler {
   return async (c, next) => {
     if (SAFE_METHODS.has(c.req.method)) return next();
 
@@ -72,13 +72,28 @@ export function csrfProtection(options?: { cookieNames?: string[] }): Middleware
     // anonymous POST cannot be a *cross-site request forgery* against an
     // account, because there is no account to ride.
     //
-    // All three session families are checked: the customer session, the admin
-    // session and the private-demo session. Omitting the admin cookie here
-    // would leave the highest-privilege surface in the product as the one
-    // without a double-submit token.
-    const cookieHeader = c.req.header("cookie") ?? "";
-    const hasSessionCookie = cookieNames.some((name) => cookieHeader.includes(`${name}=`));
-    if (hasSessionCookie && !verifyCsrfToken(c)) {
+    // All four session families are checked: the customer session, the admin
+    // session, the private-demo session and the employer session. Omitting
+    // the admin cookie here would leave the highest-privilege surface in the
+    // product as the one without a double-submit token.
+    //
+    // WHY these are real decode-and-verify reads, not a raw cookie-name
+    // string check: a cookie header is client-controlled input. A stale,
+    // idle-expired or signature-invalid leftover from an earlier visit still
+    // satisfies `cookieHeader.includes("pb_session=")` even though the
+    // session it names is dead — readSession/readStaffSession/
+    // readEmployerSession all verify the signature and expiry, they don't
+    // just check presence. Gating on raw presence meant a browser carrying
+    // old cookie litter (e.g. an idle-expired admin session from an earlier
+    // tab) got permanently 403'd on every anonymous POST — including demo
+    // invitation redemption — with the generic "Request rejected." message,
+    // until that stale cookie's max-age finally elapsed on its own.
+    const hasValidSession =
+      Boolean(readSession(c)) ||
+      Boolean(readStaffSession(c, "admin")) ||
+      Boolean(readStaffSession(c, "demo")) ||
+      Boolean(readEmployerSession(c));
+    if (hasValidSession && !verifyCsrfToken(c)) {
       audit({
         action: "csrf.token.rejected",
         actor: "anonymous",
