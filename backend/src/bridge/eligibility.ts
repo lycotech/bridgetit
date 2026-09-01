@@ -59,6 +59,7 @@ export async function computeEligibility(userId: string, kycStatus: string): Pro
 
   let earnedWageEstimate: number | null = null;
   let currentPeriodStart: string | null = null;
+  let expectedPayDate: string | null = null;
   if (latest) {
     const base = latest.netPay !== null ? Number(latest.netPay) : Number(latest.grossPay);
     const start = latest.cycle.periodStart.getTime();
@@ -68,6 +69,7 @@ export async function computeEligibility(userId: string, kycStatus: string): Pro
     const fraction = span > 0 ? Math.min(1, Math.max(0, (now - start) / span)) : 1;
     earnedWageEstimate = Math.round(base * fraction * 100) / 100;
     currentPeriodStart = latest.cycle.periodStart.toISOString().slice(0, 10);
+    expectedPayDate = latest.cycle.expectedPayDate.toISOString().slice(0, 10);
   }
 
   const eligible = employmentVerified && employerActive && payrollVerified && kycApproved;
@@ -96,6 +98,7 @@ export async function computeEligibility(userId: string, kycStatus: string): Pro
       kycApproved,
       earnedWageEstimate,
       currentPeriodStart,
+      expectedPayDate,
       reasons,
     },
     employeeRecordId: employeeRecord?.id ?? null,

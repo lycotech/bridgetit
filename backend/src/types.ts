@@ -1073,6 +1073,8 @@ export const eligibilitySchema = z.object({
   /** Best-effort proration of the most recent linked pay record. Null until payroll is verified. */
   earnedWageEstimate: z.number().nullable(),
   currentPeriodStart: z.string().nullable(),
+  /** The employer's real payroll cycle pay date — for showing a real "payday" marker, not an invented one. */
+  expectedPayDate: z.string().nullable(),
   /** Human-readable blockers, empty when `eligible` is true. */
   reasons: z.array(z.string()),
 });
