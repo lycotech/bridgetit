@@ -1378,9 +1378,33 @@ export const riskEmployerListItemSchema = z.object({
   currentScore: z.number().nullable(),
   currentTier: z.string().nullable(),
   earlyWarningLevel: z.string(),
+  /** Real count of Employer Portal team seats (EmployerUser rows) — not the self-reported employeeCount band. */
+  teamMemberCount: z.number(),
+  /** Real count of uploaded payroll roster rows (EmployeeRecord) — how many employees this employer has actually onboarded. */
+  rosterCount: z.number(),
   createdAt: z.string(),
 });
 export type RiskEmployerListItem = z.infer<typeof riskEmployerListItemSchema>;
+
+/**
+ * Admin → Investors directory (backend/src/routes/admin-investors.ts).
+ * `accountType === "investor"` real customers, with their real committed
+ * capital — the per-investor detail that `/admin/reports`'s aggregate
+ * deliberately does not show. No yield/return figure — same honesty
+ * limitation as the customer-facing Investments panel, because none exists.
+ */
+export const adminInvestorListItemSchema = z.object({
+  id: z.string(),
+  fullName: z.string(),
+  email: z.string(),
+  kycStatus: z.string(),
+  status: z.string(),
+  committedCapital: z.number(),
+  withdrawnCapital: z.number(),
+  activeCommitmentCount: z.number(),
+  joinedAt: z.string(),
+});
+export type AdminInvestorListItem = z.infer<typeof adminInvestorListItemSchema>;
 
 export const riskComponentSchema = z.object({
   component: z.string(),

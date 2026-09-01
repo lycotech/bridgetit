@@ -129,6 +129,9 @@ export default function CreditRisk() {
                         <span className="mt-1 block text-xs text-muted-foreground">
                           {e.status} · {e.industry ?? "No industry set"}
                         </span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {e.teamMemberCount} team · {e.rosterCount} employees
+                        </span>
                       </button>
                     </li>
                   ))}
@@ -142,7 +145,22 @@ export default function CreditRisk() {
           {!selected ? (
             <Panel title="No employer selected" description="Choose one from the list to score it." />
           ) : (
-            <AsyncPanel query={score} loading={<LoadingRows rows={6} />}>
+            <>
+              {(() => {
+                const employer = employers.data?.items.find((e) => e.id === selected);
+                if (!employer) return null;
+                return (
+                  <Panel title={employer.registeredName} description="Company profile — real team seats and payroll roster size.">
+                    <div className="space-y-1">
+                      <SummaryRow label="Status" value={employer.status} />
+                      <SummaryRow label="Industry" value={employer.industry ?? "Not set"} />
+                      <SummaryRow label="Employer Portal team seats" value={String(employer.teamMemberCount)} />
+                      <SummaryRow label="Payroll roster (real, uploaded)" value={String(employer.rosterCount)} />
+                    </div>
+                  </Panel>
+                );
+              })()}
+              <AsyncPanel query={score} loading={<LoadingRows rows={6} />}>
               {(data) => (
                 <div className="space-y-5">
                   <Panel
@@ -313,6 +331,7 @@ export default function CreditRisk() {
                 </div>
               )}
             </AsyncPanel>
+            </>
           )}
 
           {selected && limits.data?.items.length ? (

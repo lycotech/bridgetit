@@ -23,6 +23,7 @@ import RegisteredUsers from "./pages/admin/portal/RegisteredUsers";
 import KycReview from "./pages/admin/portal/KycReview";
 import Employers from "./pages/admin/portal/Employers";
 import CreditRisk from "./pages/admin/portal/CreditRisk";
+import Investors from "./pages/admin/portal/Investors";
 import AdminReports from "./pages/admin/portal/Reports";
 import DemoInvitations from "./pages/admin/portal/DemoInvitations";
 import SupportRequests from "./pages/admin/portal/SupportRequests";
@@ -256,6 +257,7 @@ const App = () => (
               <Route path="kyc" element={<KycReview />} />
               <Route path="employers" element={<Employers />} />
               <Route path="risk" element={<CreditRisk />} />
+              <Route path="investors" element={<Investors />} />
               <Route path="reports" element={<AdminReports />} />
               <Route path="invitations" element={<DemoInvitations />} />
               <Route path="support" element={<SupportRequests />} />

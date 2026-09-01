@@ -162,11 +162,17 @@ adminRiskRouter.get("/employers", async (c) => {
       currentTier: true,
       earlyWarningLevel: true,
       createdAt: true,
+      _count: { select: { employerUsers: true, employees: true } },
     },
   });
   return c.json({
     data: {
-      items: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })),
+      items: rows.map(({ _count, ...r }) => ({
+        ...r,
+        teamMemberCount: _count.employerUsers,
+        rosterCount: _count.employees,
+        createdAt: r.createdAt.toISOString(),
+      })),
     },
   });
 });

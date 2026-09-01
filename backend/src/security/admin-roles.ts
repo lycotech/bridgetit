@@ -72,6 +72,8 @@ export type AdminPermission =
   | "risk.view"
   /** Read portfolio-wide aggregates — no individual customer detail. */
   | "reports.view"
+  /** Read the real investor directory — who they are, real KYC status, real committed capital. */
+  | "investors.view"
   /* --- Acting --- */
   /** Approve or reject a KYC submission. The regulated decision. */
   | "kyc.decide"
@@ -149,6 +151,7 @@ const ADMIN_ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[]> = {
     "risk.view",
     "risk.decide",
     "reports.view",
+    "investors.view",
     "kyc.decide",
     "users.suspend",
     "employers.manage",
@@ -173,6 +176,7 @@ const ADMIN_ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[]> = {
     // record the decision. Underwriting authority is not an operations job.
     "risk.view",
     "reports.view",
+    "investors.view",
     // Support is operations' job: read the request, read how to reach the person
     // well, answer it. Escalating someone as vulnerable is NOT here — that goes
     // to a Super Admin, because it is a judgement about a person rather than a
@@ -196,6 +200,7 @@ const ADMIN_ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[]> = {
     "support.view",
     "risk.view",
     "reports.view",
+    "investors.view",
   ],
 };
 
@@ -234,6 +239,7 @@ export const PORTAL_SECTIONS = [
   { key: "kyc", label: "KYC review", permission: "kyc.view" },
   { key: "employers", label: "Employers", permission: "employers.view" },
   { key: "risk", label: "Credit risk", permission: "risk.view" },
+  { key: "investors", label: "Investors", permission: "investors.view" },
   { key: "reports", label: "Reports", permission: "reports.view" },
   { key: "invitations", label: "Demo invitations", permission: "invitations.view" },
   { key: "support", label: "Support requests", permission: "support.view" },
