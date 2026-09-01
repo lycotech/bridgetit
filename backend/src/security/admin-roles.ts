@@ -109,7 +109,16 @@ export type AdminPermission =
    * state — so it belongs to whoever is accountable for that judgement, not to
    * everyone who can answer a message.
    */
-  | "support.escalate";
+  | "support.escalate"
+  /**
+   * Provision or reset the three standing internal QA fixture accounts
+   * (one employer, one employee, one investor) Super Admin uses to check any
+   * portal without registering a new real account each time. Deliberately
+   * NOT granted alongside the read permissions — creating real, credentialed
+   * accounts is closer in weight to `admins.manage` than to `users.view`, so
+   * it stays Super Admin only.
+   */
+  | "test_access.manage";
 
 /**
  * Every role can see the overview and read the audit trail of its own area.
@@ -160,6 +169,7 @@ const ADMIN_ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[]> = {
     "security.manage",
     "support.manage",
     "support.escalate",
+    "test_access.manage",
   ],
   kyc_reviewer: [...BASE, "users.view", "kyc.view", "kyc.decide"],
   operations_admin: [
@@ -246,4 +256,5 @@ export const PORTAL_SECTIONS = [
   { key: "admins", label: "Admin users", permission: "admins.view" },
   { key: "audit", label: "Audit logs", permission: "audit.view" },
   { key: "security", label: "Security settings", permission: "security.view" },
+  { key: "test-access", label: "Test accounts", permission: "test_access.manage" },
 ] as const satisfies readonly { key: string; label: string; permission: AdminPermission }[];

@@ -36,6 +36,7 @@ import { supportRouter } from "./routes/support";
 import { demoRouter } from "./routes/demo";
 import { aiAssistantRouter } from "./routes/ai-assistant";
 import { adminInvestorsRouter } from "./routes/admin-investors";
+import { adminTestAccessRouter } from "./routes/admin-test-access";
 import { logMailPosture } from "./email/mailer";
 import { securityHeaders } from "./security/headers";
 import { csrfProtection } from "./security/csrf";
@@ -225,6 +226,7 @@ app.route("/api/admin/kyc", adminKycRouter);
 // the first time — see admin-risk.ts's header for what is and isn't covered.
 app.route("/api/admin/risk", adminRiskRouter);
 app.route("/api/admin/investors", adminInvestorsRouter);
+app.route("/api/admin/test-access", adminTestAccessRouter);
 app.route("/api/admin/reports", adminReportsRouter);
 app.route("/api/admin", adminRouter);
 app.route("/api/demo", demoRouter);

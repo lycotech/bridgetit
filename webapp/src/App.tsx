@@ -24,6 +24,7 @@ import KycReview from "./pages/admin/portal/KycReview";
 import Employers from "./pages/admin/portal/Employers";
 import CreditRisk from "./pages/admin/portal/CreditRisk";
 import Investors from "./pages/admin/portal/Investors";
+import TestAccess from "./pages/admin/portal/TestAccess";
 import AdminReports from "./pages/admin/portal/Reports";
 import DemoInvitations from "./pages/admin/portal/DemoInvitations";
 import SupportRequests from "./pages/admin/portal/SupportRequests";
@@ -265,6 +266,7 @@ const App = () => (
               <Route path="audit" element={<AuditLogs />} />
               <Route path="security" element={<SecuritySettings />} />
               <Route path="mail" element={<OutgoingMail />} />
+              <Route path="test-access" element={<TestAccess />} />
               <Route path="*" element={<Navigate to="/admin" replace />} />
             </Route>
 

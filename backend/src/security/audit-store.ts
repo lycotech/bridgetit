@@ -77,6 +77,7 @@ export interface RecordInput {
     | "preferences"
     | "consent"
     | "ai_assistant"
+    | "test_access"
     | null;
   targetId?: string | null;
   previousStatus?: string | null;

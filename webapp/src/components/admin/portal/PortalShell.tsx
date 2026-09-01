@@ -5,6 +5,7 @@ import {
   Building2,
   FileClock,
   Gauge,
+  KeyRound,
   LayoutDashboard,
   LifeBuoy,
   LogOut,
@@ -48,6 +49,7 @@ const SECTIONS: { to: string; label: string; permission: string; icon: LucideIco
   { to: "/admin/audit", label: "Audit logs", permission: "audit.view", icon: FileClock },
   { to: "/admin/security", label: "Security settings", permission: "security.view", icon: ShieldHalf },
   { to: "/admin/mail", label: "Outgoing mail", permission: "security.view", icon: Mail },
+  { to: "/admin/test-access", label: "Test accounts", permission: "test_access.manage", icon: KeyRound },
 ];
 
 function initials(name: string): string {

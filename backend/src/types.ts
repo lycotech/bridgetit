@@ -2055,6 +2055,8 @@ export const AUDIT_ACTIONS = [
   "reports.viewed",
   "ai_assistant.chat.replied",
   "ai_assistant.chat.error",
+  "admin_test_access.provisioned",
+  "admin_test_access.password_reset",
 
   // KYC
   "kyc.submitted",
@@ -2188,6 +2190,8 @@ export const AUDIT_ACTION_LABELS: Partial<Record<AuditAction, string>> = {
   "audit.exported": "Audit trail exported",
   "ai_assistant.chat.replied": "AI Assistant replied",
   "ai_assistant.chat.error": "AI Assistant request failed",
+  "admin_test_access.provisioned": "Test accounts provisioned",
+  "admin_test_access.password_reset": "Test account password reset",
 };
 
 export function auditActionLabel(action: string): string {
@@ -2560,3 +2564,49 @@ export const aiAssistantChatResponseSchema = z.object({
   reply: z.string(),
 });
 export type AiAssistantChatResponseView = z.infer<typeof aiAssistantChatResponseSchema>;
+
+// ---------------------------------------------------------- admin test access ---
+
+/**
+ * Admin → Test accounts (backend/src/routes/admin-test-access.ts).
+ *
+ * Three standing, real, fully-eligible fixture accounts (one employer, one
+ * employee, one investor) that Super Admin provisions once and reuses
+ * indefinitely to check any portal — instead of registering a brand-new real
+ * account through the normal signup flow every time. NOT impersonation: each
+ * is a real account with its own real password, logged into normally through
+ * the ordinary sign-in forms. A password is only ever returned once, right
+ * after it is generated — never stored in plaintext, never re-shown.
+ */
+const testAccessSlotSchema = z.object({
+  provisioned: z.boolean(),
+  email: z.string(),
+});
+export const testAccessStatusSchema = z.object({
+  employer: testAccessSlotSchema,
+  employee: testAccessSlotSchema,
+  investor: testAccessSlotSchema,
+});
+export type TestAccessStatusView = z.infer<typeof testAccessStatusSchema>;
+
+const testAccessCredentialSchema = z.object({
+  email: z.string(),
+  /** Only present the moment a slot is newly created or its password is reset. */
+  password: z.string().nullable(),
+});
+export const testAccessProvisionResultSchema = z.object({
+  employer: testAccessCredentialSchema,
+  employee: testAccessCredentialSchema,
+  investor: testAccessCredentialSchema,
+});
+export type TestAccessProvisionResult = z.infer<typeof testAccessProvisionResultSchema>;
+
+export const resetTestAccessPasswordSchema = z.object({
+  which: z.enum(["employer", "employee", "investor"]),
+});
+export type ResetTestAccessPasswordInput = z.infer<typeof resetTestAccessPasswordSchema>;
+
+export const testAccessPasswordResetResultSchema = z.object({
+  password: z.string(),
+});
+export type TestAccessPasswordResetResult = z.infer<typeof testAccessPasswordResetResultSchema>;
