@@ -70,11 +70,17 @@ import InvestorDocuments from "./pages/account/investor/Documents";
 import { RequireGate, RedirectIfSignedIn as RedirectIfCustomerSignedIn } from "@/components/account/AccountGate";
 import EmployerPortalRegister from "./pages/employer-portal/Register";
 import EmployerPortalLogin from "./pages/employer-portal/Login";
-import EmployerPortalHome from "./pages/employer-portal/Home";
 import EmployerPortalAcceptInvite from "./pages/employer-portal/AcceptInvite";
 import EmployerPortalPayroll from "./pages/employer-portal/Payroll";
 import EmployerPortalSalaryAccountRequests from "./pages/employer-portal/SalaryAccountRequests";
 import EmployerPortalSalaryAccountRequestReview from "./pages/employer-portal/SalaryAccountRequestReview";
+import { RealEmployerShell } from "@/components/employer-portal/RealEmployerShell";
+import EmployerOverview from "./pages/employer-portal/real/Overview";
+import EmployerEmployees from "./pages/employer-portal/real/Employees";
+import EmployerSettings from "./pages/employer-portal/real/Settings";
+import EmployerPayrollModel from "./pages/employer-portal/real/PayrollModel";
+import EmployerBridgeActivity from "./pages/employer-portal/real/BridgeActivity";
+import { ComingSoon } from "./pages/account/ComingSoon";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import Verify from "./pages/auth/Verify";
 import SelectRole from "./pages/auth/SelectRole";
@@ -276,16 +282,24 @@ const App = () => (
             <Route path="/employer-portal/register" element={<EmployerPortalRegister />} />
             <Route path="/employer-portal/login" element={<EmployerPortalLogin />} />
             <Route path="/employer-portal/accept-invite" element={<EmployerPortalAcceptInvite />} />
-            <Route path="/employer-portal" element={<EmployerPortalHome />} />
-            <Route path="/employer-portal/payroll" element={<EmployerPortalPayroll />} />
-            <Route
-              path="/employer-portal/salary-account-requests"
-              element={<EmployerPortalSalaryAccountRequests />}
-            />
-            <Route
-              path="/employer-portal/salary-account-requests/:id"
-              element={<EmployerPortalSalaryAccountRequestReview />}
-            />
+
+            {/* REAL EMPLOYER PORTAL DASHBOARD — a structural/visual replica of the
+                mock demo's /employer shell, wired to real data. See
+                webapp/src/components/employer-portal/RealEmployerShell.tsx. */}
+            <Route path="/employer-portal" element={<RealEmployerShell />}>
+              <Route index element={<EmployerOverview />} />
+              <Route path="employees" element={<EmployerEmployees />} />
+              <Route path="payroll" element={<EmployerPortalPayroll />} />
+              <Route path="salary-account-requests" element={<EmployerPortalSalaryAccountRequests />} />
+              <Route path="salary-account-requests/:id" element={<EmployerPortalSalaryAccountRequestReview />} />
+              <Route path="payroll-model" element={<EmployerPayrollModel />} />
+              <Route path="salary-buffer" element={<ComingSoon title="Salary Buffer" description="Ask PayBridge to cover a payroll shortfall so salaries land on time." />} />
+              <Route path="bridge-activity" element={<EmployerBridgeActivity />} />
+              <Route path="repayments" element={<ComingSoon title="Repayments" description="Settlement and reconciliation against payroll." />} />
+              <Route path="reports" element={<ComingSoon title="Reports" description="Downloadable reports for finance and audit." />} />
+              <Route path="integrations" element={<ComingSoon title="Integrations" description="Connect your payroll system directly." />} />
+              <Route path="settings" element={<EmployerSettings />} />
+            </Route>
 
             {/* The gate in front of the private demonstration environment. */}
             <Route path="/private-demo" element={<PrivateDemo />} />

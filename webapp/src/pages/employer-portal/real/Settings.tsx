@@ -1,37 +1,20 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { ClipboardList, Loader2, LogOut, UserPlus, Wallet } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { PageHeader, ActionButton } from "@/components/dashboard/PageHeader";
 import { Panel, SummaryRow } from "@/components/dashboard/Panel";
 import { TwoFactorPanel } from "@/components/account/TwoFactorPanel";
 import {
   useDisableEmployerTwoFactor,
   useEmployerSession,
-  useEmployerLogout,
   useEnableEmployerTwoFactor,
   useEnrolEmployerTwoFactor,
 } from "@/lib/employer/session";
-import {
-  useEmployerProfile,
-  useEmployerTeam,
-  useInviteEmployerTeamMember,
-  useUpdateEmployerProfile,
-} from "@/lib/employer/company";
-import {
-  EMPLOYER_TEAM_ROLE_LABELS,
-  type UpdateEmployerProfileInput,
-} from "../../../../backend/src/types";
+import { useEmployerProfile, useEmployerTeam, useInviteEmployerTeamMember, useUpdateEmployerProfile } from "@/lib/employer/company";
+import { EMPLOYER_TEAM_ROLE_LABELS, type UpdateEmployerProfileInput } from "../../../../../backend/src/types";
 
-/**
- * Real employer home — company profile and team, backed by the actual
- * `/api/employer/*` service. This is intentionally NOT the polished demo
- * dashboard at `/employer/*` (which is still mock data behind the private
- * demo gate — see AGENTS.md). This page is smaller and plainer because
- * everything on it is real.
- */
-export default function EmployerPortalHome() {
+/** Real Employer Portal Settings — `/employer-portal/settings`. Company profile, team, and security. */
+export default function EmployerSettings() {
   const session = useEmployerSession();
-  const logout = useEmployerLogout();
   const isAdmin = session.data?.role === "employer_admin";
 
   const profile = useEmployerProfile(session.data?.authenticated ?? false);
@@ -62,22 +45,10 @@ export default function EmployerPortalHome() {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSent, setInviteSent] = useState(false);
 
-  if (session.isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-  if (!session.data?.authenticated) return <Navigate to="/employer-portal/login" replace />;
-
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault();
     setSaved(false);
-    await updateProfile.mutateAsync({
-      ...form,
-      employeeCount: form.employeeCount ? Number(form.employeeCount) : undefined,
-    });
+    await updateProfile.mutateAsync({ ...form, employeeCount: form.employeeCount ? Number(form.employeeCount) : undefined });
     setSaved(true);
   }
 
@@ -96,34 +67,8 @@ export default function EmployerPortalHome() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-7 px-4 py-10 sm:px-6">
-      <PageHeader
-        eyebrow={session.data.employerStatus ?? undefined}
-        title={session.data.employerName ?? "Your company"}
-        description={`Signed in as ${session.data.fullName} (${EMPLOYER_TEAM_ROLE_LABELS[session.data.role!]})`}
-        actions={
-          <>
-            <ActionButton variant="secondary" to="/employer-portal/payroll" icon={<Wallet className="h-4 w-4" />}>
-              Payroll
-            </ActionButton>
-            <ActionButton
-              variant="secondary"
-              to="/employer-portal/salary-account-requests"
-              icon={<ClipboardList className="h-4 w-4" />}
-            >
-              Salary accounts
-            </ActionButton>
-            <ActionButton
-              variant="ghost"
-              icon={<LogOut className="h-4 w-4" />}
-              onClick={() => logout.mutate()}
-              loading={logout.isPending}
-            >
-              Sign out
-            </ActionButton>
-          </>
-        }
-      />
+    <div className="space-y-6">
+      <PageHeader title="Settings" description="Company profile, team access, and account security." />
 
       <Panel title="Company profile" description="Visible to your team. Used for underwriting once you apply.">
         {profile.isLoading ? (
@@ -134,17 +79,8 @@ export default function EmployerPortalHome() {
             <Field label="Trading name" value={form.tradingName ?? ""} onChange={(v) => setForm((f) => ({ ...f, tradingName: v }))} />
             <Field label="Industry" value={form.industry ?? ""} onChange={(v) => setForm((f) => ({ ...f, industry: v }))} />
             <Field label="Website" value={form.website ?? ""} onChange={(v) => setForm((f) => ({ ...f, website: v }))} />
-            <Field
-              label="Registered address"
-              value={form.registeredAddress ?? ""}
-              onChange={(v) => setForm((f) => ({ ...f, registeredAddress: v }))}
-            />
-            <Field
-              label="Employee count"
-              type="number"
-              value={form.employeeCount?.toString() ?? ""}
-              onChange={(v) => setForm((f) => ({ ...f, employeeCount: v ? Number(v) : undefined }))}
-            />
+            <Field label="Registered address" value={form.registeredAddress ?? ""} onChange={(v) => setForm((f) => ({ ...f, registeredAddress: v }))} />
+            <Field label="Employee count" type="number" value={form.employeeCount?.toString() ?? ""} onChange={(v) => setForm((f) => ({ ...f, employeeCount: v ? Number(v) : undefined }))} />
             {!isAdmin ? (
               <p className="text-xs text-muted-foreground">Only a company admin can edit this profile.</p>
             ) : (
@@ -163,10 +99,7 @@ export default function EmployerPortalHome() {
         <Panel title="Team" description="Everyone with access to this company's PayBridge account.">
           <div className="space-y-2">
             {team.data?.items.map((member) => (
-              <div
-                key={member.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-secondary/30 px-3.5 py-2.5"
-              >
+              <div key={member.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-secondary/30 px-3.5 py-2.5">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-foreground">{member.fullName}</p>
                   <p className="truncate text-xs text-muted-foreground">{member.email}</p>
@@ -202,27 +135,12 @@ export default function EmployerPortalHome() {
         </Panel>
       ) : null}
 
-      <TwoFactorPanel
-        enabled={session.data.twoFactorEnabled}
-        enrol={enrol2fa}
-        enable={enable2fa}
-        disable={disable2fa}
-      />
+      <TwoFactorPanel enabled={session.data?.twoFactorEnabled ?? false} enrol={enrol2fa} enable={enable2fa} disable={disable2fa} />
     </div>
   );
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-}) {
+function Field({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
   return (
     <label className="block text-sm font-medium text-muted-foreground">
       {label}
