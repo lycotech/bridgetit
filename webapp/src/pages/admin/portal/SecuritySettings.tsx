@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { AlertCircle, CheckCircle2, KeyRound, ShieldCheck, Smartphone } from "lucide-react";
+import { AlertCircle, CheckCircle2, Eye, KeyRound, ShieldCheck, Smartphone } from "lucide-react";
 import { PageHeader, ActionButton } from "@/components/dashboard/PageHeader";
 import { PasswordField } from "@/components/dashboard/forms";
 import { MfaStep } from "@/components/admin/portal/steps/MfaStep";
+import { AdminDisplaySettings } from "@/components/admin/portal/DisplaySettings";
 import { Button } from "@/components/ui/button";
 import { useAdminChangePassword, useAdminSession } from "@/lib/admin/portal-session";
 import { ADMIN_ROLE_LABELS } from "../../../../../backend/src/types";
@@ -120,7 +121,10 @@ export default function SecuritySettings() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Security settings" description="Your credentials, your second factor and your session." />
+      <PageHeader
+        title="Security settings"
+        description="Your credentials, your second factor, your session and how the console is displayed."
+      />
 
       <section className="rounded-2xl border border-border bg-card/60 p-5 md:p-6">
         <dl className="grid gap-4 sm:grid-cols-3">
@@ -143,6 +147,17 @@ export default function SecuritySettings() {
           </div>
         </dl>
       </section>
+
+      {/* Ahead of the credential panels on purpose: an administrator who
+          cannot comfortably read this page needs the control that fixes that
+          before anything asking them to type a password carefully. */}
+      <Panel
+        title="Display & accessibility"
+        description="How the Admin Console is drawn. These are display settings only — they change nothing about your account or permissions."
+        icon={Eye}
+      >
+        <AdminDisplaySettings />
+      </Panel>
 
       <Panel
         title="Change password"
