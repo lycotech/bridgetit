@@ -1,42 +1,34 @@
 import { useRef, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
-import { ArrowLeft, Loader2, Upload } from "lucide-react";
+import { Layers, Upload, Users, Wallet } from "lucide-react";
 import { PageHeader, ActionButton } from "@/components/dashboard/PageHeader";
 import { Panel, SummaryRow } from "@/components/dashboard/Panel";
+import { StatCard, StatGrid } from "@/components/dashboard/StatCard";
 import { PayrollModelPanel } from "@/components/employer-portal/PayrollModelPanel";
 import { useEmployerSession } from "@/lib/employer/session";
-import {
-  useCreatePayrollCycle,
-  useInviteEmployeeLink,
-  usePayrollCycle,
-  usePayrollCycles,
-  usePayrollEmployees,
-  useUploadPayrollCsv,
-} from "@/lib/employer/payroll";
+import { useCreatePayrollCycle, usePayrollCycle, usePayrollCycles, useUploadPayrollCsv } from "@/lib/employer/payroll";
 
 const naira = (v: number | null) =>
   v === null ? "—" : `₦${v.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /**
- * Real payroll ingestion — Employer portal → Payroll.
+ * Real payroll ingestion — Employer Portal → Payroll.
  *
  * Uploads land in `PayrollCycle`/`PayrollRecord`/`EmployeeRecord`. This page
  * does not compute or show timeliness/risk — that is `eir/risk/payroll.ts`'s
  * job, not yet wired to a route (see AGENTS.md §6). This page only gets real
  * data into the tables that engine will eventually read.
+ *
+ * The roster used to be shown again at the bottom of this page — now that
+ * Employees has its own dedicated page (`real/Employees.tsx`), showing it
+ * twice would just be duplication, so it was removed from here.
  */
 export default function EmployerPortalPayroll() {
   const session = useEmployerSession();
   const canWrite = session.data?.role !== "employer_viewer";
 
   const cycles = usePayrollCycles(session.data?.authenticated ?? false);
-  const employees = usePayrollEmployees(session.data?.authenticated ?? false);
   const createCycle = useCreatePayrollCycle();
   const upload = useUploadPayrollCsv();
-  const inviteLink = useInviteEmployeeLink();
-  const [invitingId, setInvitingId] = useState<string | null>(null);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteMessage, setInviteMessage] = useState<string | null>(null);
 
   const [selectedCycle, setSelectedCycle] = useState<string | null>(null);
   const detail = usePayrollCycle(selectedCycle);
@@ -48,15 +40,6 @@ export default function EmployerPortalPayroll() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadResult, setUploadResult] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-
-  if (session.isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-  if (!session.data?.authenticated) return <Navigate to="/employer-portal/login" replace />;
 
   async function createCycleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -85,25 +68,23 @@ export default function EmployerPortalPayroll() {
     }
   }
 
-  return (
-    <div className="mx-auto max-w-4xl space-y-7 px-4 py-10 sm:px-6">
-      <Link
-        to="/employer-portal"
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" /> Back to company home
-      </Link>
+  const rows = cycles.data?.items ?? [];
+  const latest = rows[0];
 
+  return (
+    <div className="space-y-6">
       <PageHeader
-        eyebrow="Payroll"
-        title="Payroll cycles"
+        title="Payroll"
         description="Create a pay cycle, then upload a CSV of pay records against it. Re-uploading replaces that cycle's records."
       />
 
-      <PayrollModelPanel
-        authenticated={session.data?.authenticated ?? false}
-        isAdmin={session.data?.role === "employer_admin"}
-      />
+      <StatGrid columns={3}>
+        <StatCard label="Pay cycles" value={rows.length} icon={<Layers className="h-4 w-4" />} tone="primary" />
+        <StatCard label="Latest cycle employees" value={latest?.employeeCount ?? 0} icon={<Users className="h-4 w-4" />} />
+        <StatCard label="Latest cycle total" value={naira(latest?.totalAmount ?? null)} icon={<Wallet className="h-4 w-4" />} tone="protected" />
+      </StatGrid>
+
+      <PayrollModelPanel authenticated={session.data?.authenticated ?? false} isAdmin={session.data?.role === "employer_admin"} />
 
       {canWrite ? (
         <Panel title="New pay cycle">
@@ -138,8 +119,8 @@ export default function EmployerPortalPayroll() {
 
       <div className="grid gap-5 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <Panel title="Cycles" bodyClassName="space-y-2">
-          {cycles.data?.items.length ? (
-            cycles.data.items.map((cycle) => (
+          {rows.length ? (
+            rows.map((cycle) => (
               <button
                 key={cycle.id}
                 type="button"
@@ -214,83 +195,6 @@ export default function EmployerPortalPayroll() {
           )}
         </div>
       </div>
-
-      <Panel
-        title="Roster"
-        description="Everyone who has ever appeared in an uploaded pay cycle. Invite them to connect their PayBridge account so their eligibility reflects real payroll."
-      >
-        {inviteMessage ? <p className="mb-3 text-sm text-success">{inviteMessage}</p> : null}
-        {employees.data?.items.length ? (
-          <div className="space-y-1.5">
-            {employees.data.items.map((e) => (
-              <div key={e.id} className="rounded-xl border border-border bg-secondary/30 px-3.5 py-2.5">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-foreground">{e.fullName ?? e.staffRef}</p>
-                    <p className="truncate text-xs text-muted-foreground">{e.staffRef}</p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {e.linked ? (
-                      <>
-                        <span className="text-xs font-semibold uppercase tracking-wide text-success">Connected</span>
-                        <span
-                          className={`text-xs font-semibold uppercase tracking-wide ${
-                            e.eligible ? "text-success" : "text-muted-foreground"
-                          }`}
-                        >
-                          {e.eligible ? "Eligible for Access" : e.kycApproved === false ? "KYC pending" : "Not yet eligible"}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {e.status}
-                      </span>
-                    )}
-                    {!e.linked && canWrite ? (
-                      <ActionButton
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setInvitingId(invitingId === e.id ? null : e.id);
-                          setInviteMessage(null);
-                        }}
-                      >
-                        Invite
-                      </ActionButton>
-                    ) : null}
-                  </div>
-                </div>
-                {invitingId === e.id ? (
-                  <form
-                    onSubmit={async (event) => {
-                      event.preventDefault();
-                      await inviteLink.mutateAsync({ employeeRecordId: e.id, email: inviteEmail });
-                      setInviteMessage(`Invitation sent to ${inviteEmail}.`);
-                      setInvitingId(null);
-                      setInviteEmail("");
-                    }}
-                    className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-border/70 pt-2.5"
-                  >
-                    <input
-                      type="email"
-                      required
-                      placeholder="their email address"
-                      value={inviteEmail}
-                      onChange={(ev) => setInviteEmail(ev.target.value)}
-                      className="h-10 flex-1 rounded-xl border border-border bg-background px-3 text-sm text-foreground"
-                    />
-                    <ActionButton type="submit" size="sm" loading={inviteLink.isPending}>
-                      Send
-                    </ActionButton>
-                  </form>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No employees yet — upload a pay cycle to populate the roster.</p>
-        )}
-      </Panel>
     </div>
   );
 }

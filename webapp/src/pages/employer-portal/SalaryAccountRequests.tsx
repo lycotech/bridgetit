@@ -1,7 +1,8 @@
-import { ArrowLeft, Loader2 } from "lucide-react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { ClipboardCheck, Clock3, ThumbsUp } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { PageHeader, ActionButton } from "@/components/dashboard/PageHeader";
 import { Panel } from "@/components/dashboard/Panel";
+import { StatCard, StatGrid } from "@/components/dashboard/StatCard";
 import { DataTable, CellStack, type Column } from "@/components/dashboard/DataTable";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { useEmployerSession } from "@/lib/employer/session";
@@ -33,14 +34,9 @@ export default function EmployerPortalSalaryAccountRequests() {
   const navigate = useNavigate();
   const requests = useSalaryAccountRequests(session.data?.authenticated ?? false);
 
-  if (session.isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-  if (!session.data?.authenticated) return <Navigate to="/employer-portal/login" replace />;
+  const rows = requests.data?.items ?? [];
+  const pending = rows.filter((r) => r.status === "pending_review").length;
+  const active = rows.filter((r) => r.status === "active").length;
 
   const columns: Column<SalaryAccountRequestRow>[] = [
     {
@@ -80,19 +76,17 @@ export default function EmployerPortalSalaryAccountRequests() {
   ];
 
   return (
-    <div className="mx-auto max-w-4xl space-y-7 px-4 py-10 sm:px-6">
-      <Link
-        to="/employer-portal"
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" /> Back to company home
-      </Link>
-
+    <div className="space-y-6">
       <PageHeader
-        eyebrow="Payroll Setup · Option A"
         title="Salary Account Requests"
         description="Employees who have activated PayBridge Access and requested a change of salary account. Your payroll process does not change — only the destination account for participating employees."
       />
+
+      <StatGrid columns={3}>
+        <StatCard label="Awaiting your decision" value={pending} icon={<Clock3 className="h-4 w-4" />} tone={pending > 0 ? "attention" : "default"} />
+        <StatCard label="Active" value={active} icon={<ThumbsUp className="h-4 w-4" />} tone="success" />
+        <StatCard label="Total requests" value={rows.length} icon={<ClipboardCheck className="h-4 w-4" />} />
+      </StatGrid>
 
       <Panel title="Existing Payroll Model" description="For employers using their existing payroll system.">
         <div className="flex flex-wrap items-center gap-2">
@@ -112,7 +106,7 @@ export default function EmployerPortalSalaryAccountRequests() {
 
       <Panel title="Requests">
         <DataTable
-          rows={requests.data?.items ?? []}
+          rows={rows}
           columns={columns}
           getRowId={(row) => row.id}
           isLoading={requests.isLoading}
