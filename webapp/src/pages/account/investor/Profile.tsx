@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/dashboard/PageHeader";
 import { Panel, SummaryRow } from "@/components/dashboard/Panel";
 import { StatCard, StatGrid } from "@/components/dashboard/StatCard";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
+import { PreferencesPanel } from "@/components/prefs/PreferencesPanel";
 import { useSession } from "@/lib/account/session";
 import { TwoFactorSection } from "@/pages/account/AccountHome";
 
@@ -14,6 +15,11 @@ export default function InvestorProfile() {
   return (
     <div className="space-y-6">
       <PageHeader title="Profile" description="Your details and account security." />
+
+      {/* Ahead of anything that reads session data — see the note on the
+          employee profile: the control that fixes an unreadable screen must not
+          sit below something that can be slow or fail. */}
+      <PreferencesPanel />
 
       <StatGrid columns={3}>
         <StatCard
