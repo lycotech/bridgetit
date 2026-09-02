@@ -10,7 +10,7 @@ const QUICK_LINKS = [
   { to: "/account/employee/bridge", label: "Bridge", note: "Access pay you've already earned", icon: Gauge },
   { to: "/account/employee/pay", label: "My Pay", note: "Salary account and destination", icon: Wallet },
   { to: "/account/employee/savings", label: "Save", note: "Set money aside", icon: Sprout },
-  { to: "/account/employee/grow", label: "Grow", note: "Your PayBridge Score", icon: HeartPulse },
+  { to: "/account/employee/grow", label: "Learn", note: "Your PayBridge Score", icon: HeartPulse },
   { to: "/account/employee/refer", label: "Refer & Earn", note: "Invite a colleague", icon: Gift },
 ];
 

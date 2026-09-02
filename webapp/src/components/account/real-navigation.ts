@@ -50,7 +50,7 @@ export const REAL_PORTAL_NAV: Record<RealPortal, RealNavSection[]> = {
         { to: "/account/employee/pay", label: "My Pay", icon: Wallet },
         { to: "/account/employee/savings", label: "Save", icon: Sprout },
         { to: "/account/employee/invest", label: "Invest", icon: LineChart },
-        { to: "/account/employee/grow", label: "Grow", icon: HeartPulse },
+        { to: "/account/employee/grow", label: "Learn", icon: HeartPulse },
         { to: "/account/employee/refer", label: "Refer & Earn", icon: Share2 },
       ],
     },

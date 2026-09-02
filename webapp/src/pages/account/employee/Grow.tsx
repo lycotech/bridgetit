@@ -21,7 +21,7 @@ export default function EmployeeGrow() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Grow" description="Your PayBridge Score, and what it's built from." />
+      <PageHeader title="Learn" description="Your PayBridge Score, and what it's built from." />
 
       {score.data ? (
         <Panel title="Where you stand" icon={<Gauge className="h-5 w-5 text-primary" />}>

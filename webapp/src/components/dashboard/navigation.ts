@@ -57,7 +57,7 @@ export const PORTAL_NAV: Record<Portal, NavSection[]> = {
         { to: "/employee/pay", label: "My Pay", icon: Wallet },
         { to: "/employee/savings", label: "Save", icon: Sprout },
         { to: "/employee/invest", label: "Invest", icon: LineChart },
-        { to: "/employee/grow", label: "Grow", icon: HeartPulse },
+        { to: "/employee/grow", label: "Learn", icon: HeartPulse },
         { to: "/employee/refer", label: "Refer & Earn", icon: Share2 },
       ],
     },

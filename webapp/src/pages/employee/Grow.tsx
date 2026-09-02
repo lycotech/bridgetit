@@ -66,7 +66,7 @@ export default function EmployeeGrowPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Grow"
+        eyebrow="Learn"
         title="Your financial wellbeing"
         description="What your money habits are telling us, what would help most next, and the short lessons behind each suggestion. The aim is a calmer month — not more Bridge."
       />
