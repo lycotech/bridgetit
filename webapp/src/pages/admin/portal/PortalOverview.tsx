@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowUpRight, ClipboardCheck, Mail, Ticket, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/PageHeader";
+import { Panel } from "@/components/dashboard/Panel";
 import { adminApi } from "@/lib/admin";
 import { useAdminSession } from "@/lib/admin/portal-session";
 
@@ -39,7 +40,7 @@ function Tile({
   );
 
   const shell =
-    "group relative rounded-2xl border border-border bg-card/60 p-5 transition-colors hover:border-primary/40";
+    "group relative rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary/40";
 
   return to ? (
     <Link to={to} className={shell}>
@@ -94,9 +95,8 @@ export default function PortalOverview() {
         />
       </div>
 
-      <section className="rounded-2xl border border-border bg-card/60 p-5">
-        <h2 className="text-sm font-semibold text-foreground">Where to start</h2>
-        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+      <Panel title="Where to start">
+        <ul className="grid gap-3 sm:grid-cols-2">
           <li>
             <Link
               to="/admin/invitations"
@@ -126,7 +126,7 @@ export default function PortalOverview() {
             </Link>
           </li>
         </ul>
-      </section>
+      </Panel>
     </div>
   );
 }
