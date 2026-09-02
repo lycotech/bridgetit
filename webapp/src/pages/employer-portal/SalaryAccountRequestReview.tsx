@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { CheckCircle2, ShieldAlert } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { PageHeader, ActionButton } from "@/components/dashboard/PageHeader";
 import { Panel, SummaryRow } from "@/components/dashboard/Panel";
 import { ConfirmDialog, Modal } from "@/components/dashboard/Modal";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { CheckboxField } from "@/components/dashboard/forms";
+import { useEmployerSession } from "@/lib/employer/session";
 import {
   salaryAccountStatusLabel,
   useDecideSalaryAccountRequest,
@@ -51,6 +52,7 @@ function dateTime(iso: string): string {
  */
 export default function EmployerPortalSalaryAccountRequestReview() {
   const { id } = useParams<{ id: string }>();
+  const session = useEmployerSession();
   const navigate = useNavigate();
   const request = useSalaryAccountRequest(id ?? null);
   const decide = useDecideSalaryAccountRequest();
@@ -59,11 +61,16 @@ export default function EmployerPortalSalaryAccountRequestReview() {
   const [authorised, setAuthorised] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const data = request.data;
-
-  if (request.isLoading) {
-    return <PageHeader title="Employee Request to Update Salary Account" description="Loading…" />;
+  if (session.isLoading || request.isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
+  if (!session.data?.authenticated) return <Navigate to="/employer-portal/login" replace />;
+
+  const data = request.data;
 
   async function submitDecision(decision: "approve" | "reject") {
     if (!id) return;
@@ -78,8 +85,15 @@ export default function EmployerPortalSalaryAccountRequestReview() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader title="Employee Request to Update Salary Account" />
+    <div className="mx-auto max-w-3xl space-y-7 px-4 py-10 sm:px-6">
+      <Link
+        to="/employer-portal/salary-account-requests"
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" /> Back to requests
+      </Link>
+
+      <PageHeader eyebrow="Payroll Setup · Option A" title="Employee Request to Update Salary Account" />
 
       {!data ? (
         <Panel title="Not found" description="This request does not exist, or does not belong to your company." />
