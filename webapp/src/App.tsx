@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import Index from "./pages/Index";
+import DemoNew from "./pages/DemoNew";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Contact from "./pages/Contact";
@@ -156,6 +157,9 @@ const App = () => (
             <Route path="/terms" element={<Terms />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/brand" element={<Brand />} />
+            {/* Preview of a proposed new homepage. Deliberately unlinked from
+                the site — "/" still renders <Index /> untouched. */}
+            <Route path="/demonew" element={<DemoNew />} />
             <Route path="/security" element={<Security />} />
 
             {/* Segmented registration — the only public conversion path.
