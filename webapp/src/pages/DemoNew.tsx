@@ -35,19 +35,45 @@ import {
  * at `ProofBar` and `Testimonial` below. Both would put a claim on a public
  * marketing page that PayBridge cannot substantiate.
  *
- * PHOTOGRAPHY: the mock's hero and employer photographs are not in the repo.
- * `HERO_PHOTO` / `EMPLOYER_PHOTO` below are the only two places a file path is
- * needed — drop the images into `public/brand/` and set the constants, and the
- * placeholders disappear with no other edit.
+ * PHOTOGRAPHY: three brand photographs, converted from the ~1.8MB PNG originals
+ * to WebP at display width — 5.4MB of source became 168KB, which is the
+ * difference between a homepage that loads on Nigerian mobile data and one that
+ * does not. `PhotoSlot` still falls back to a labelled placeholder if a path is
+ * ever unset, so the layout cannot collapse behind a missing file.
  */
 
-const HERO_PHOTO: string | null = null;
-const EMPLOYER_PHOTO: string | null = null;
+const HERO_PHOTO: string | null = "/brand/photos/hero-employee.webp";
+const EMPLOYER_PHOTO: string | null = "/brand/photos/employer-briefing.webp";
+const EMPLOYEES_PHOTO: string | null = "/brand/photos/employees-at-home.webp";
 
 /* ------------------------------------------------------------------ shared */
 
-function PhotoSlot({ src, alt, label, className }: { src: string | null; alt: string; label: string; className?: string }) {
-  if (src) return <img src={src} alt={alt} className={className} />;
+function PhotoSlot({
+  src,
+  alt,
+  label,
+  className,
+  priority = false,
+}: {
+  src: string | null;
+  alt: string;
+  label: string;
+  className?: string;
+  /** The hero is above the fold and must not be lazy-loaded; everything else is. */
+  priority?: boolean;
+}) {
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={alt}
+        className={className}
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        {...(priority ? { fetchPriority: "high" as const } : {})}
+      />
+    );
+  }
   return (
     <div
       className={`flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary/[0.10] via-secondary to-secondary/60 text-center ${className ?? ""}`}
@@ -155,8 +181,9 @@ function Hero() {
         <div className="relative min-h-[520px] lg:min-h-[690px]">
           <PhotoSlot
             src={HERO_PHOTO}
-            alt="An employee using PayBridge"
+            alt="An employee in a PayBridge hoodie checking her phone outside her workplace"
             label="Hero photography"
+            priority
             className="h-full w-full rounded-3xl object-cover object-top lg:rounded-none"
           />
 
@@ -298,7 +325,23 @@ function HumanSide() {
         carry into work, without asking employers to become lenders.
       </p>
 
-      <div className="mt-12 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+      {/* The emotional beat of this section, given its own width: the point is
+          that this happens at home, not at a desk. */}
+      <figure className="relative mt-11 overflow-hidden rounded-[26px]">
+        <PhotoSlot
+          src={EMPLOYEES_PHOTO}
+          alt="Two people at home looking at a phone together"
+          label="Employee lifestyle photography"
+          className="h-[300px] w-full object-cover object-[center_28%] lg:h-[420px]"
+        />
+        <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[hsl(214_60%_9%)]/90 to-transparent px-6 pb-6 pt-16 lg:px-10">
+          <p className="max-w-[540px] font-serif text-xl font-bold leading-snug text-white lg:text-2xl">
+            The money conversations that matter most rarely happen at a desk.
+          </p>
+        </figcaption>
+      </figure>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <article className="relative min-h-[390px] overflow-hidden rounded-[26px] bg-[hsl(214_56%_12%)] p-10 text-white">
           <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full border border-white/10" />
           <p className="text-[0.78rem] font-extrabold uppercase tracking-[0.2em] text-[#8fe0cb]">A simple idea</p>
@@ -378,9 +421,9 @@ function Employers() {
       <div className="grid items-center gap-12 lg:grid-cols-[0.9fr_1.1fr]">
         <PhotoSlot
           src={EMPLOYER_PHOTO}
-          alt="An employer team at work"
+          alt="A PayBridge team member briefing an employer's staff on Access, Save, Invest and Learn"
           label="Employer photography"
-          className="min-h-[420px] overflow-hidden rounded-[30px] object-cover lg:min-h-[510px]"
+          className="h-[420px] w-full overflow-hidden rounded-[30px] object-cover object-[center_25%] lg:h-[510px]"
         />
         <div>
           <Eyebrow>For employers</Eyebrow>
