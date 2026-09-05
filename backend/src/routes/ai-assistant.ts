@@ -7,6 +7,7 @@ import { requireUser, requireFinancialAccess } from "./auth";
 import { computeEligibility } from "../bridge/eligibility";
 import { computePayBridgeScore } from "../scoring/paybridge-score";
 import { getAnthropicClient, isAiAssistantConfigured } from "../ai/client";
+import { env } from "../env";
 import { aiAssistantChatInputSchema, type AiAssistantChatResponseView } from "../types";
 
 /**
@@ -143,7 +144,7 @@ aiAssistantRouter.post("/chat", validate("json", aiAssistantChatInputSchema), as
   let reply: string;
   try {
     const response = await client.messages.create({
-      model: "claude-opus-5",
+      model: env.ANTHROPIC_MODEL,
       max_tokens: 1024,
       output_config: { effort: "low" },
       system: [

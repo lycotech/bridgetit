@@ -107,6 +107,24 @@ const envSchema = z.object({
     .refine((v) => v.startsWith("sk-ant-"), "must look like an Anthropic key")
     .optional(),
 
+  /**
+   * Which Claude model answers the AI Assistant.
+   *
+   * Configurable so the cost/quality trade can be re-made from the server's
+   * env and a restart, without a code change and a redeploy — model choice is
+   * an operational decision, not a structural one.
+   *
+   * Default is Sonnet 5: the assistant answers short support questions over a
+   * pre-built data snapshot, which does not need Opus's depth, and Sonnet sits
+   * a full pricing tier below it. Set ANTHROPIC_MODEL=claude-opus-5 to go back.
+   *
+   * NOTE for anyone switching to Haiku: it rejects the `effort` parameter with
+   * a 400 ("This model does not support the effort parameter"), so a Haiku
+   * switch is not just an env change — `output_config` has to come out of
+   * routes/ai-assistant.ts too.
+   */
+  ANTHROPIC_MODEL: z.string().min(1).default("claude-sonnet-5"),
+
   /* ------------------------------------------------------------------ MAIL */
   /*
    * Outbound mail. Every one of these is optional: with none of them set the
@@ -207,6 +225,9 @@ function validateEnv() {
         : "EPHEMERAL — KYC data will not survive a restart",
       openai: parsed.data.OPENAI_API_KEY ? "configured" : "absent",
       anthropic: parsed.data.ANTHROPIC_API_KEY ? "configured" : "absent",
+      // A model name is not a secret, and printing it is how you confirm which
+      // model is actually live without reading the code or guessing from a bill.
+      anthropicModel: parsed.data.ANTHROPIC_MODEL,
       // Presence only, never the value — see the note above.
       adminLogin: parsed.data.ADMIN_USERNAME ? "configured" : "absent",
     }),
